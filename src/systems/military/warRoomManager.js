@@ -168,6 +168,9 @@ const ATTACK_TYPE_INFO = {
   AIRVSHIPS:     { emoji:'✈️', label:'Airstrike on Ships',          verb:'bombed the navy of' },
   AIRVAIR:       { emoji:'✈️', label:'Dogfight',                    verb:'engaged in a dogfight with' },
   NAVAL:         { emoji:'🚢', label:'Naval Attack',                verb:'launched a naval attack on' },
+  NAVALVSHIPS:   { emoji:'🚢', label:'Naval Attack on Ships',        verb:'engaged the navy of' },
+  NAVALVINFRA:   { emoji:'🚢', label:'Naval Attack on Infrastructure', verb:'shelled the coast of' },
+  NAVALVMONEY:   { emoji:'🚢', label:'Naval Attack on Treasury',     verb:'raided the ports of' },
   MISSILE:       { emoji:'🚀', label:'Missile Strike',              verb:'fired a missile at' },
   MISSILEFAIL:   { emoji:'🛰️', label:'Missile Intercepted',         verb:'attempted a missile strike on' },
   NUKE:          { emoji:'☢️', label:'Nuclear Strike',              verb:'launched a nuke at' },
@@ -263,13 +266,6 @@ async function processRoomAttacks(client, room) {
       if (newAttacks.length===0) continue;
       newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
       for (const attack of newAttacks) {
-        // TEMP DIAGNOSTIC: logs the raw type/success the API actually sent for
-        // every attack. Naval GIFs have never worked across 3 different GIF
-        // sources, which means the bug likely isn't the GIF link — it's that
-        // attack.type may not literally be the string "NAVAL" we assume.
-        // Using logger.info (not .debug) so this isn't filtered out on
-        // Railway's production log level. Remove this line once confirmed.
-        logger.info(`ATTACK DEBUG: id=${attack.id} type=${JSON.stringify(attack.type)} success=${JSON.stringify(attack.success)} war_id=${war_id}`);
         if (['FORTIFY'].includes(attack.type)) continue;
         const embed = buildAttackReport(attack, ctx);
         try {
