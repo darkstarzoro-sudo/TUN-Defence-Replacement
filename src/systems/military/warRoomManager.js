@@ -185,24 +185,32 @@ function getAttackTypeInfo(rawType) {
 // NOTE: WarAttack does NOT expose att_nation_name/def_nation_name in the P&W API
 // (confirmed via live GraphQL validation error). Names are resolved from the
 // war room's own known nations (ctx) instead of the attack payload.
-// Reports are plain text (not embeds) per preference — the GIF URL is put on
-// its own line so Discord renders it as an inline image preview automatically.
 function buildAttackReport(attack, ctx={}) {
   const successTag  = normalizeSuccess(attack.success);
   const typeInfo     = getAttackTypeInfo(attack.type);
   const attName      = resolveAttackName(attack.attid, ctx);
   const defName      = resolveAttackName(attack.defid, ctx);
 
-  const resultText = successTag==='UTTER_FAILURE' ? 'and it was an **utter failure**'
-    : successTag==='PYRRHIC_VICTORY' ? 'and it was a **pyrrhic victory** — won at great cost'
-    : successTag==='MODERATE_SUCCESS' ? 'and it was a **moderate success**'
-    : 'and it was an **immense triumph**';
+  const resultText = successTag==='UTTER_FAILURE' ? 'an **utter failure**'
+    : successTag==='PYRRHIC_VICTORY' ? 'a **pyrrhic victory** — won at great cost'
+    : successTag==='MODERATE_SUCCESS' ? 'a **moderate success**'
+    : 'an **immense triumph**';
 
-  const lines = [];
-  lines.push(`${typeInfo.emoji} **${attName}** ${typeInfo.verb} **${defName}** (${typeInfo.label}), ${resultText}!`);
+  const color = successTag==='UTTER_FAILURE' ? 0xe74c3c
+    : successTag==='PYRRHIC_VICTORY' ? 0xf39c12
+    : successTag==='MODERATE_SUCCESS' ? 0x3498db
+    : 0x2ecc71;
+
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(`${typeInfo.emoji} ${typeInfo.label}`)
+    .setDescription(
+      `**[${attName}](https://politicsandwar.com/nation/id=${attack.attid})** ${typeInfo.verb} ` +
+      `**[${defName}](https://politicsandwar.com/nation/id=${attack.defid})** — it was ${resultText}!`
+    );
 
   if ((attack.infra_destroyed||0)>0) {
-    lines.push(`🏗️ Infrastructure destroyed: ${Number(attack.infra_destroyed).toFixed(2)} (worth $${Number(attack.infra_destroyed_value||0).toLocaleString()})`);
+    embed.addFields({ name:'🏗️ Infrastructure Destroyed', value:`${Number(attack.infra_destroyed).toFixed(2)} infra ($${Number(attack.infra_destroyed_value||0).toLocaleString()})`, inline:false });
   }
 
   const attLosses=[], defLosses=[];
@@ -214,20 +222,22 @@ function buildAttackReport(attack, ctx={}) {
   if ((attack.def_tanks_lost||0)>0)    defLosses.push(`🚗 ${Number(attack.def_tanks_lost).toLocaleString()} tanks`);
   if ((attack.def_aircraft_lost||0)>0) defLosses.push(`✈️ ${Number(attack.def_aircraft_lost).toLocaleString()} planes`);
   if ((attack.def_ships_lost||0)>0)    defLosses.push(`🚢 ${Number(attack.def_ships_lost).toLocaleString()} ships`);
-  if (attLosses.length>0) lines.push(`⚔️ ${attName} lost: ${attLosses.join(', ')}`);
-  if (defLosses.length>0) lines.push(`🛡️ ${defName} lost: ${defLosses.join(', ')}`);
+  if (attLosses.length>0) embed.addFields({ name:`⚔️ ${attName} Lost`, value:attLosses.join('\n'), inline:true });
+  if (defLosses.length>0) embed.addFields({ name:`🛡️ ${defName} Lost`, value:defLosses.join('\n'), inline:true });
 
   const munUsed=(attack.att_mun_used||0)+(attack.def_mun_used||0);
   const gasUsed=(attack.att_gas_used||0)+(attack.def_gas_used||0);
-  if (munUsed>0||gasUsed>0) lines.push(`⛽ Munitions used: ${munUsed.toFixed(1)} | Gasoline used: ${gasUsed.toFixed(1)}`);
+  if (munUsed>0||gasUsed>0) embed.addFields({ name:'⛽ Resources Used', value:`Munitions: ${munUsed.toFixed(1)} | Gasoline: ${gasUsed.toFixed(1)}`, inline:false });
 
-  // gifUrl is delivered as a bare-minimum embed (image only, no title/text)
-  // rather than pasted into the message text — Discord requires the raw URL
-  // to be visible as text to auto-preview it, which left an ugly link
-  // sitting in the message. An image-only embed shows just the picture.
   const gifUrl = getGif(attack.type, successTag);
+  if (gifUrl) embed.setImage(gifUrl);
 
-  return { text: lines.join('\n'), gifUrl };
+  if (attack.date) {
+    const d = new Date(attack.date);
+    if (!isNaN(d.getTime())) embed.setTimestamp(d);
+  }
+
+  return embed;
 }
 
 async function checkWarRoomAttacks(client) {
@@ -254,11 +264,9 @@ async function processRoomAttacks(client, room) {
       newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
       for (const attack of newAttacks) {
         if (['FORTIFY'].includes(attack.type)) continue;
-        const report = buildAttackReport(attack, ctx);
-        const payload = { content: report.text };
-        if (report.gifUrl) payload.embeds = [new EmbedBuilder().setImage(report.gifUrl)];
+        const embed = buildAttackReport(attack, ctx);
         try {
-          await channel.send(payload);
+          await channel.send({ embeds: [embed] });
         } catch (sendErr) {
           // Do NOT mark this attack as reported — the send genuinely failed
           // (often a transient Discord network blip). Stop here so this
