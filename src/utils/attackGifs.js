@@ -11,8 +11,13 @@
 //
 // Canonical type keys match the real P&W GraphQL `AttackType` enum:
 // GROUND, AIRVINFRA, AIRVSOLDIERS, AIRVTANKS, AIRVMONEY, AIRVSHIPS,
-// AIRVAIR, NAVAL, MISSILE, MISSILEFAIL, NUKE, NUKEFAIL, FORTIFY,
-// PEACE, VICTORY, ALLIANCELOOT.
+// AIRVAIR, NAVALVSHIPS, NAVALVINFRA, NAVALVMONEY, MISSILE, MISSILEFAIL,
+// NUKE, NUKEFAIL, FORTIFY, PEACE, VICTORY, ALLIANCELOOT.
+// NOTE: naval attacks come back as NAVALVSHIPS / NAVALVINFRA (confirmed via
+// live diagnostic logging on 2026-08-31), NOT a plain "NAVAL" — an older
+// P&W schema reference gave "NAVAL" and that was wrong/outdated, which is
+// why naval GIFs never worked across three different GIF sources before
+// this was traced down. Kept NAVAL itself mapped too just in case.
 // Old AIRSTRIKE_*/NAVAL_INFRA key names are kept as aliases below so
 // nothing breaks if the API naming ever differs from what's confirmed.
 //
@@ -45,6 +50,9 @@ const GIFS = {
   AIRVSHIPS:    { default: [AIRSTRIKE_GIF] },
   AIRVAIR:      { default: [DOGFIGHT_GIF] },
   NAVAL:        { default: [NAVAL_GIF] },
+  NAVALVSHIPS:  { default: [NAVAL_GIF] },
+  NAVALVINFRA:  { default: [NAVAL_GIF] },
+  NAVALVMONEY:  { default: [NAVAL_GIF] }, // not yet confirmed live, added defensively to match the AIRV* naming pattern
   MISSILE:      { UTTER_FAILURE: [MISSILE_FAIL_GIF], default: [MISSILE_GIF] },
   MISSILEFAIL:  { default: [MISSILE_FAIL_GIF] },
   NUKE:         { UTTER_FAILURE: [NUKE_FAIL_GIF], default: [NUKE_GIF] },
