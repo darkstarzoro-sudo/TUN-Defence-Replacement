@@ -263,6 +263,13 @@ async function processRoomAttacks(client, room) {
       if (newAttacks.length===0) continue;
       newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
       for (const attack of newAttacks) {
+        // TEMP DIAGNOSTIC: logs the raw type/success the API actually sent for
+        // every attack. Naval GIFs have never worked across 3 different GIF
+        // sources, which means the bug likely isn't the GIF link — it's that
+        // attack.type may not literally be the string "NAVAL" we assume.
+        // Using logger.info (not .debug) so this isn't filtered out on
+        // Railway's production log level. Remove this line once confirmed.
+        logger.info(`ATTACK DEBUG: id=${attack.id} type=${JSON.stringify(attack.type)} success=${JSON.stringify(attack.success)} war_id=${war_id}`);
         if (['FORTIFY'].includes(attack.type)) continue;
         const embed = buildAttackReport(attack, ctx);
         try {
