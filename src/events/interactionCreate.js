@@ -1,0 +1,225 @@
+// ============================================================
+// src/events/interactionCreate.js
+// War Status button now deletes old card and reposts at bottom pinned
+// ============================================================
+
+const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const logger = require('../utils/logger');
+const { checkPermission } = require('../utils/permissions');
+const { run, queryOne, query } = require('../utils/database');
+const { buildWarButtons, fetchWarData, fetchNationData, sendOrRefreshWarCard } = require('../systems/military/warRoomManager');
+const { getAllianceMembers } = require('../utils/pwApi');
+const { buildNationToDiscordMap } = require('../utils/nationLink');
+
+module.exports = {
+  name: Events.InteractionCreate,
+  async execute(interaction, client) {
+
+    // ── SLASH COMMANDS ─────────────────────────────────────
+    if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
+      if (command.requiredRole && !checkPermission(interaction, command.requiredRole)) {
+        return interaction.reply({ content: '❌ You do not have permission to use this command.', flags: 64 });
+      }
+      try {
+        await command.execute(interaction, client);
+      } catch (error) {
+        logger.error(`Error in /${interaction.commandName}: ${error.message}`, error);
+        const msg = { content: '❌ Something went wrong. The error has been logged.', flags: 64 };
+        if (interaction.replied || interaction.deferred) await interaction.followUp(msg).catch(() => {});
+        else await interaction.reply(msg).catch(() => {});
+      }
+      return;
+    }
+
+    if (!interaction.isButton()) return;
+    const { customId } = interaction;
+
+    if (customId.startsWith('assignment_accept_'))   return handleAssignmentAccept(interaction, parseInt(customId.replace('assignment_accept_','')), client);
+    if (customId.startsWith('assignment_decline_'))  return handleAssignmentDecline(interaction, parseInt(customId.replace('assignment_decline_','')), client);
+    if (customId.startsWith('assignment_complete_')) return handleAssignmentComplete(interaction, parseInt(customId.replace('assignment_complete_','')), client);
+    if (customId.startsWith('war_claim_'))   return handleWarClaim(interaction, customId.replace('war_claim_',''), client);
+    if (customId.startsWith('war_status_'))  return handleWarStatus(interaction, customId.replace('war_status_',''), client);
+    if (customId.startsWith('war_counter_')) return handleWarCounter(interaction, customId.replace('war_counter_',''), client);
+    if (customId.startsWith('war_spies_'))   return handleWarSpies(interaction, customId.replace('war_spies_',''), client);
+  },
+};
+
+// ── WAR CLAIM ────────────────────────────────────────────────
+async function handleWarClaim(interaction, warId, client) {
+  try {
+    await interaction.deferReply({ flags: 64 });
+    const room = queryOne('SELECT * FROM war_rooms WHERE channel_id=? AND status=?', [interaction.channelId, 'active']);
+    if (!room) return interaction.editReply('❌ This is not an active war room.');
+
+    run('UPDATE war_rooms SET director_discord_id=? WHERE id=?', [interaction.user.id, room.id]);
+
+    const members   = query('SELECT * FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
+    const ourMember = members[0];
+    const [warData, ourData, enemyData] = await Promise.all([
+      fetchWarData(warId, ourMember?.nation_id, room.enemy_nation_id),
+      ourMember ? fetchNationData(ourMember.nation_id) : Promise.resolve(null),
+      fetchNationData(room.enemy_nation_id),
+    ]);
+
+    const updatedRoom = queryOne('SELECT * FROM war_rooms WHERE id=?', [room.id]);
+    await sendOrRefreshWarCard(interaction.channel, updatedRoom, warData, ourData, enemyData, interaction.user.username, false, null);
+
+    await interaction.editReply('✅ You are now the **Director** of this war room.');
+    await interaction.channel.send({ content: `🎖️ <@${interaction.user.id}> has claimed command of this war room.` });
+  } catch (err) {
+    logger.error(`War claim error: ${err.message}`);
+    await interaction.editReply('❌ Something went wrong.').catch(() => {});
+  }
+}
+
+// ── WAR STATUS — deletes old card, reposts at bottom, pins it ─
+async function handleWarStatus(interaction, warId, client) {
+  try {
+    await interaction.deferReply({ flags: 64 });
+    const room = queryOne('SELECT * FROM war_rooms WHERE channel_id=?', [interaction.channelId]);
+    if (!room) return interaction.editReply('❌ This is not a war room.');
+
+    const members   = query('SELECT * FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
+    const ourMember = members[0];
+
+    const [warData, ourData, enemyData] = await Promise.all([
+      fetchWarData(warId, ourMember?.nation_id, room.enemy_nation_id),
+      ourMember ? fetchNationData(ourMember.nation_id) : Promise.resolve(null),
+      fetchNationData(room.enemy_nation_id),
+    ]);
+
+    const director = room.director_discord_id
+      ? (await client.users.fetch(room.director_discord_id).catch(() => null))?.username
+      : null;
+
+    // Delete old, send fresh at bottom, pin it
+    await sendOrRefreshWarCard(interaction.channel, room, warData, ourData, enemyData, director, false, null);
+    await interaction.editReply('✅ War card refreshed — check the bottom of the channel (it\'s pinned).');
+  } catch (err) {
+    logger.error(`War status error: ${err.message}`);
+    await interaction.editReply('❌ Something went wrong.').catch(() => {});
+  }
+}
+
+// ── WAR COUNTER ──────────────────────────────────────────────
+async function handleWarCounter(interaction, warId, client) {
+  try {
+    await interaction.deferReply({ flags: 64 });
+    const room     = queryOne('SELECT * FROM war_rooms WHERE channel_id=?', [interaction.channelId]);
+    if (!room) return interaction.editReply('❌ This is not a war room.');
+    const guildRow = queryOne('SELECT alliance_id FROM guilds WHERE guild_id=?', [interaction.guildId]);
+    if (!guildRow?.alliance_id) return interaction.editReply('❌ No alliance configured.');
+
+    const [enemyData, ourMembers] = await Promise.all([fetchNationData(room.enemy_nation_id), getAllianceMembers(guildRow.alliance_id)]);
+    if (!enemyData) return interaction.editReply('❌ Could not fetch enemy data.');
+
+    const discordMap = buildNationToDiscordMap(interaction.guildId);
+    const min = (enemyData.score||0) * 0.75, max = (enemyData.score||0) * 1.75;
+    const eligible = ourMembers
+      .filter(m => m.score >= min && m.score <= max && (m.vacation_mode_turns||0) === 0 && (m.offensive_wars_count||0) < 5)
+      .sort((a, b) => (b.aircraft||0) - (a.aircraft||0));
+
+    if (eligible.length === 0) return interaction.editReply('❌ No members in war range with open slots.');
+
+    const lines = eligible.slice(0, 15).map(m => {
+      const dId = discordMap.get(m.id) || discordMap.get(String(m.id));
+      return `${dId ? `<@${dId}>` : `**${m.nation_name}**`} — [${m.nation_name}](https://politicsandwar.com/nation/id=${m.id})\n└ Score: ${Math.round(m.score).toLocaleString()} | ✈️ ${m.aircraft||0} | 🚗 ${m.tanks||0} | Slots: **${5-(m.offensive_wars_count||0)}**`;
+    });
+
+    await interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`⚔️ Counter Options vs ${enemyData.nation_name}`).setColor(0xe74c3c).setDescription(lines.join('\n\n')).addFields({ name: '📏 War Range', value: `${Math.round(min).toLocaleString()} – ${Math.round(max).toLocaleString()}`, inline: true }).setFooter({ text: `${eligible.length} eligible` }).setTimestamp()] });
+  } catch (err) {
+    logger.error(`War counter error: ${err.message}`);
+    await interaction.editReply('❌ Something went wrong.').catch(() => {});
+  }
+}
+
+// ── WAR SPIES ────────────────────────────────────────────────
+async function handleWarSpies(interaction, warId, client) {
+  try {
+    await interaction.deferReply({ flags: 64 });
+    const room     = queryOne('SELECT * FROM war_rooms WHERE channel_id=?', [interaction.channelId]);
+    if (!room) return interaction.editReply('❌ This is not a war room.');
+    const guildRow = queryOne('SELECT alliance_id FROM guilds WHERE guild_id=?', [interaction.guildId]);
+    if (!guildRow?.alliance_id) return interaction.editReply('❌ No alliance configured.');
+
+    const [enemyData, ourMembers] = await Promise.all([fetchNationData(room.enemy_nation_id), getAllianceMembers(guildRow.alliance_id)]);
+    if (!enemyData) return interaction.editReply('❌ Could not fetch enemy data.');
+
+    const discordMap = buildNationToDiscordMap(interaction.guildId);
+    const min = (enemyData.score||0) * 0.5, max = (enemyData.score||0) * 2.0;
+    const eligible = ourMembers
+      .filter(m => m.score >= min && m.score <= max && (m.vacation_mode_turns||0) === 0 && (m.spies||0) > 0)
+      .sort((a, b) => (b.spies||0) - (a.spies||0));
+
+    if (eligible.length === 0) return interaction.editReply('❌ No members in spy range with active spies.');
+
+    const lines = eligible.slice(0, 15).map(m => {
+      const dId = discordMap.get(m.id) || discordMap.get(String(m.id));
+      return `${dId ? `<@${dId}>` : `**${m.nation_name}**`} — [${m.nation_name}](https://politicsandwar.com/nation/id=${m.id})\n└ 🕵️ Spies: **${m.spies||0}** | Score: ${Math.round(m.score).toLocaleString()}`;
+    });
+
+    await interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🕵️ Spy Options vs ${enemyData.nation_name}`).setColor(0x8e44ad).setDescription(lines.join('\n\n')).addFields({ name: '🎯 Enemy Spies', value: `${enemyData.spies||0}`, inline: true }, { name: '📏 Spy Range', value: `${Math.round(min).toLocaleString()} – ${Math.round(max).toLocaleString()}`, inline: true }).setFooter({ text: `${eligible.length} in spy range` }).setTimestamp()] });
+  } catch (err) {
+    logger.error(`War spies error: ${err.message}`);
+    await interaction.editReply('❌ Something went wrong.').catch(() => {});
+  }
+}
+
+// ── ASSIGNMENT ACCEPT ────────────────────────────────────────
+async function handleAssignmentAccept(interaction, id, client) {
+  try {
+    const a = queryOne('SELECT * FROM target_assignments WHERE id=?', [id]);
+    if (!a) return interaction.reply({ content:`❌ Assignment #${id} not found.`, flags:64 });
+    if (a.assigned_to_discord_id !== interaction.user.id) return interaction.reply({ content:'❌ Not your assignment.', flags:64 });
+    if (a.status === 'accepted') return interaction.reply({ content:'✅ Already accepted.', flags:64 });
+    if (['completed','cancelled','expired'].includes(a.status)) return interaction.reply({ content:`❌ Already **${a.status}**.`, flags:64 });
+
+    run(`UPDATE target_assignments SET status='accepted', updated_at=datetime('now') WHERE id=?`, [id]);
+    const btn = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`assignment_complete_${id}`).setLabel('🏆 Mark as Completed').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setLabel('🔗 View Target').setStyle(ButtonStyle.Link).setURL(`https://politicsandwar.com/nation/id=${a.target_nation_id}`),
+    );
+    await interaction.reply({ embeds:[new EmbedBuilder().setTitle('✅ Assignment Accepted').setColor(0x2ecc71).setDescription(`You accepted the assignment to attack **[${a.target_nation_name}](https://politicsandwar.com/nation/id=${a.target_nation_id})**.\n\nClick **Mark as Completed** once you have declared war.`).setTimestamp()], components:[btn], flags:64 });
+
+    try { const o = await client.users.fetch(a.assigned_by_discord_id); await o.send({ content:`✅ <@${interaction.user.id}> accepted assignment **#${id}** — **${a.target_nation_name}**` }); } catch {}
+
+    const ch = queryOne(`SELECT discord_channel_id FROM guild_channels WHERE guild_id=? AND channel_type='wars'`,[a.guild_id]) || queryOne(`SELECT discord_channel_id FROM guild_channels WHERE guild_id=? AND channel_type='intel'`,[a.guild_id]);
+    if (ch) { const c = client.channels.cache.get(ch.discord_channel_id); if (c) await c.send({ embeds:[new EmbedBuilder().setColor(0x2ecc71).setDescription(`✅ <@${interaction.user.id}> accepted assignment **#${id}** — **[${a.target_nation_name}](https://politicsandwar.com/nation/id=${a.target_nation_id})**`).setTimestamp()] }); }
+  } catch (err) { logger.error(`Accept error: ${err.message}`); await interaction.reply({ content:'❌ Something went wrong.', flags:64 }).catch(()=>{}); }
+}
+
+// ── ASSIGNMENT DECLINE ───────────────────────────────────────
+async function handleAssignmentDecline(interaction, id, client) {
+  try {
+    const a = queryOne('SELECT * FROM target_assignments WHERE id=?', [id]);
+    if (!a) return interaction.reply({ content:`❌ Assignment #${id} not found.`, flags:64 });
+    if (a.assigned_to_discord_id !== interaction.user.id) return interaction.reply({ content:'❌ Not your assignment.', flags:64 });
+    if (['completed','cancelled','expired'].includes(a.status)) return interaction.reply({ content:`❌ Already **${a.status}**.`, flags:64 });
+
+    run(`UPDATE target_assignments SET status='cancelled', updated_at=datetime('now') WHERE id=?`, [id]);
+    await interaction.reply({ content:`❌ You declined assignment **#${id}** — **${a.target_nation_name}**.`, flags:64 });
+    try { const o = await client.users.fetch(a.assigned_by_discord_id); await o.send({ embeds:[new EmbedBuilder().setTitle('❌ Assignment Declined').setColor(0xe74c3c).addFields({name:'👤 Declined By',value:`<@${interaction.user.id}>`,inline:true},{name:'🎯 Target',value:`[${a.target_nation_name}](https://politicsandwar.com/nation/id=${a.target_nation_id})`,inline:true},{name:'⚡ Action',value:'Please reassign.',inline:false}).setTimestamp()] }); } catch {}
+  } catch (err) { logger.error(`Decline error: ${err.message}`); await interaction.reply({ content:'❌ Something went wrong.', flags:64 }).catch(()=>{}); }
+}
+
+// ── ASSIGNMENT COMPLETE ──────────────────────────────────────
+async function handleAssignmentComplete(interaction, id, client) {
+  try {
+    const a = queryOne('SELECT * FROM target_assignments WHERE id=?', [id]);
+    if (!a) return interaction.reply({ content:`❌ Assignment #${id} not found.`, flags:64 });
+    if (a.assigned_to_discord_id !== interaction.user.id) return interaction.reply({ content:'❌ Not your assignment.', flags:64 });
+    if (a.status === 'completed') return interaction.reply({ content:'✅ Already completed!', flags:64 });
+    if (a.status === 'cancelled') return interaction.reply({ content:'❌ Assignment was cancelled.', flags:64 });
+
+    run(`UPDATE target_assignments SET status='completed', updated_at=datetime('now') WHERE id=?`, [id]);
+    await interaction.reply({ embeds:[new EmbedBuilder().setTitle('🏆 Assignment Completed!').setColor(0xf1c40f).setDescription(`Great work! Target: **[${a.target_nation_name}](https://politicsandwar.com/nation/id=${a.target_nation_id})**`).setTimestamp()], flags:64 });
+
+    try { const o = await client.users.fetch(a.assigned_by_discord_id); await o.send({ content:`🏆 <@${interaction.user.id}> completed **#${id}** — **${a.target_nation_name}**` }); } catch {}
+
+    const govRole = queryOne(`SELECT discord_role_id FROM guild_roles WHERE guild_id=? AND role_type='government'`,[a.guild_id]);
+    const ch = queryOne(`SELECT discord_channel_id FROM guild_channels WHERE guild_id=? AND channel_type='wars'`,[a.guild_id]) || queryOne(`SELECT discord_channel_id FROM guild_channels WHERE guild_id=? AND channel_type='intel'`,[a.guild_id]);
+    if (ch) { const c = client.channels.cache.get(ch.discord_channel_id); if (c) await c.send({ content:govRole?`<@&${govRole.discord_role_id}>`:undefined, embeds:[new EmbedBuilder().setColor(0xf1c40f).setTitle('🏆 Target Eliminated!').setDescription(`<@${interaction.user.id}> completed **#${id}** — **[${a.target_nation_name}](https://politicsandwar.com/nation/id=${a.target_nation_id})**`).setTimestamp()] }); }
+  } catch (err) { logger.error(`Complete error: ${err.message}`); await interaction.reply({ content:'❌ Something went wrong.', flags:64 }).catch(()=>{}); }
+}
