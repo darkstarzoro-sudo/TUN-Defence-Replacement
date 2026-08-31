@@ -1,0 +1,561 @@
+[2026-06-23 16:30:02] ERROR: P&W API request failed:
+[2026-06-23 16:30:02] ERROR: Error fetching beige targets: write EPROTO C03A0000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 51
+
+Error: write EPROTO C03A0000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 51
+
+    at AxiosError.from (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:1355:24)
+    at RedirectableRequest.handleRequestError (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:4082:25)
+    at RedirectableRequest.emit (node:events:520:35)
+    at eventHandlers.<computed> (C:\Users\hp\Desktop\pw-bot\node_modules\follow-redirects\index.js:56:24)
+    at ClientRequest.emit (node:events:508:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at TLSSocket.socketErrorListener (node:_http_client:575:5)
+    at TLSSocket.emit (node:events:520:35)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:5517:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async pwQuery (C:\Users\hp\Desktop\pw-bot\src\utils\pwApi.js:20:22)
+    at async getBeigeTargets (C:\Users\hp\Desktop\pw-bot\src\systems\beige\beigeTracker.js:44:18)
+    at async processGuildBeige (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:37:26)
+    at async checkBeigeExits (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:26:7)
+    at async Task._execution (C:\Users\hp\Desktop\pw-bot\src\jobs\scheduler.js:22:5)
+[2026-06-23 19:05:11] ERROR: P&W API request failed:
+[2026-06-23 19:05:11] ERROR: Error fetching beige targets: getaddrinfo ENOTFOUND api.politicsandwar.com
+Error: getaddrinfo ENOTFOUND api.politicsandwar.com
+    at AxiosError.from (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:1355:24)
+    at RedirectableRequest.handleRequestError (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:4082:25)
+    at RedirectableRequest.emit (node:events:520:35)
+    at eventHandlers.<computed> (C:\Users\hp\Desktop\pw-bot\node_modules\follow-redirects\index.js:56:24)
+    at ClientRequest.emit (node:events:508:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at TLSSocket.socketErrorListener (node:_http_client:575:5)
+    at TLSSocket.emit (node:events:520:35)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:5517:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async pwQuery (C:\Users\hp\Desktop\pw-bot\src\utils\pwApi.js:20:22)
+    at async getBeigeTargets (C:\Users\hp\Desktop\pw-bot\src\systems\beige\beigeTracker.js:44:18)
+    at async processGuildBeige (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:37:26)
+    at async checkBeigeExits (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:26:7)
+    at async Task._execution (C:\Users\hp\Desktop\pw-bot\src\jobs\scheduler.js:22:5)
+[2026-06-23 20:25:00] ERROR: P&W API request failed:
+[2026-06-23 20:25:00] ERROR: Error fetching beige targets: getaddrinfo ENOTFOUND api.politicsandwar.com
+Error: getaddrinfo ENOTFOUND api.politicsandwar.com
+    at AxiosError.from (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:1355:24)
+    at RedirectableRequest.handleRequestError (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:4082:25)
+    at RedirectableRequest.emit (node:events:520:35)
+    at eventHandlers.<computed> (C:\Users\hp\Desktop\pw-bot\node_modules\follow-redirects\index.js:56:24)
+    at ClientRequest.emit (node:events:508:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at TLSSocket.socketErrorListener (node:_http_client:575:5)
+    at TLSSocket.emit (node:events:520:35)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:5517:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async pwQuery (C:\Users\hp\Desktop\pw-bot\src\utils\pwApi.js:20:22)
+    at async getBeigeTargets (C:\Users\hp\Desktop\pw-bot\src\systems\beige\beigeTracker.js:44:18)
+    at async processGuildBeige (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:37:26)
+    at async checkBeigeExits (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:26:7)
+    at async Task._execution (C:\Users\hp\Desktop\pw-bot\src\jobs\scheduler.js:22:5)
+[2026-06-24 10:30:18] ERROR: Error in /blitz: Unknown interaction
+DiscordAPIError[10062]: Unknown interaction
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async BurstHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:866:23)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async ChatInputCommandInteraction.reply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:193:22)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-25 01:38:38] ERROR: Error in /gov-dashboard: Received one or more errors
+Error: Received one or more errors
+    at _ObjectValidator.handleIgnoreStrategy (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:2119:72)
+    at _ObjectValidator.handleStrategy (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1983:47)
+    at _ObjectValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:2089:17)
+    at _ObjectValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.setFooter (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:350:26)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\reporting\govDashboard.js:162:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-25 01:59:25] ERROR: P&W API HTTP error: 78330000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 20
+
+[2026-06-25 07:17:54] ERROR: P&W API HTTP error: 3C3A0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 20
+
+[2026-06-25 07:17:54] ERROR: Defense monitor error for guild 1393443854514130974: 3C3A0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 20
+
+[2026-06-25 07:19:34] ERROR: Error in /war: Received one or more errors
+Error: Received one or more errors
+    at _ArrayValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1254:70)
+    at _ArrayValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.addFields (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:246:31)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:91:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-25 07:20:02] ERROR: Failed to send mass attack alert: Received one or more errors
+[2026-06-25 07:20:39] ERROR: Error in /war: Received one or more errors
+Error: Received one or more errors
+    at _ArrayValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1254:70)
+    at _ArrayValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.addFields (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:246:31)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:91:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-25 08:14:11] ERROR: Error in /war: Received one or more errors
+Error: Received one or more errors
+    at _UnionValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1965:23)
+    at _UnionValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.setDescription (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:336:26)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:149:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-25 09:50:31] ERROR: Error in /war: Received one or more errors
+Error: Received one or more errors
+    at _ArrayValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1254:70)
+    at _ArrayValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.addFields (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:246:31)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:91:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-25 10:05:02] ERROR: Failed to send mass attack alert: Received one or more errors
+[2026-06-25 10:45:00] ERROR: Military monitor error for guild 1394283356459503737: D8070000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 51
+
+[2026-06-26 00:06:00] ERROR: ❌ Failed to start bot: file is not a database
+Error: file is not a database
+    at e.handleError (C:\Users\hp\Desktop\pw-bot\node_modules\sql.js\dist\sql-wasm.js:90:192)
+    at e.run (C:\Users\hp\Desktop\pw-bot\node_modules\sql.js\dist\sql-wasm.js:87:256)
+    at createTables (C:\Users\hp\Desktop\pw-bot\src\utils\database.js:97:6)
+    at connectDatabase (C:\Users\hp\Desktop\pw-bot\src\utils\database.js:37:3)
+    at async main (C:\Users\hp\Desktop\pw-bot\src\index.js:29:5)
+[2026-06-26 00:06:22] ERROR: ❌ Failed to start bot: file is not a database
+Error: file is not a database
+    at e.handleError (C:\Users\hp\Desktop\pw-bot\node_modules\sql.js\dist\sql-wasm.js:90:192)
+    at e.run (C:\Users\hp\Desktop\pw-bot\node_modules\sql.js\dist\sql-wasm.js:87:256)
+    at createTables (C:\Users\hp\Desktop\pw-bot\src\utils\database.js:97:6)
+    at connectDatabase (C:\Users\hp\Desktop\pw-bot\src\utils\database.js:37:3)
+    at async main (C:\Users\hp\Desktop\pw-bot\src\index.js:29:5)
+[2026-06-26 00:12:15] ERROR: Error in /war: Received one or more errors
+Error: Received one or more errors
+    at _ArrayValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1254:70)
+    at _ArrayValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.addFields (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:246:31)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:108:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-26 08:30:03] ERROR: Failed to send mass attack alert: Received one or more errors
+[2026-06-26 08:37:01] ERROR: Error in /war: Received one or more errors
+Error: Received one or more errors
+    at _ArrayValidator.handle (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:1254:70)
+    at _ArrayValidator.parse (C:\Users\hp\Desktop\pw-bot\node_modules\@sapphire\shapeshift\dist\cjs\index.cjs:972:90)
+    at EmbedBuilder.addFields (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\builders\dist\index.js:246:31)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:108:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:28:9)
+[2026-06-27 07:59:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 07:59:15] ERROR: Defense monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:00:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:00:15] ERROR: Defense monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:00:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:00:15] ERROR: Error fetching beige targets: timeout of 15000ms exceeded
+AxiosError: timeout of 15000ms exceeded
+    at createTimeoutError (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:3612:14)
+    at RedirectableRequest.handleTimeout (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:4140:15)
+    at RedirectableRequest.emit (node:events:508:28)
+    at Timeout._onTimeout (C:\Users\hp\Desktop\pw-bot\node_modules\follow-redirects\index.js:233:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+    at Axios.request (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:5517:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async pwQuery (C:\Users\hp\Desktop\pw-bot\src\utils\pwApi.js:23:17)
+    at async getBeigeTargets (C:\Users\hp\Desktop\pw-bot\src\systems\beige\beigeTracker.js:34:18)
+    at async processGuildBeige (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:37:26)
+    at async checkBeigeExits (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:26:7)
+    at async Task._execution (C:\Users\hp\Desktop\pw-bot\src\jobs\scheduler.js:32:5)
+[2026-06-27 08:00:16] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:00:16] ERROR: Military monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:01:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:01:15] ERROR: Defense monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:02:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:02:15] ERROR: Defense monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:03:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:03:15] ERROR: Defense monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:04:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-06-27 08:04:15] ERROR: Defense monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-06-27 08:05:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:05:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:05:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:05:00] ERROR: Error fetching beige targets: getaddrinfo ENOTFOUND api.politicsandwar.com
+Error: getaddrinfo ENOTFOUND api.politicsandwar.com
+    at AxiosError.from (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:1355:24)
+    at RedirectableRequest.handleRequestError (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:4082:25)
+    at RedirectableRequest.emit (node:events:520:35)
+    at eventHandlers.<computed> (C:\Users\hp\Desktop\pw-bot\node_modules\follow-redirects\index.js:56:24)
+    at ClientRequest.emit (node:events:508:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at TLSSocket.socketErrorListener (node:_http_client:575:5)
+    at TLSSocket.emit (node:events:520:35)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:5517:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async pwQuery (C:\Users\hp\Desktop\pw-bot\src\utils\pwApi.js:23:17)
+    at async getBeigeTargets (C:\Users\hp\Desktop\pw-bot\src\systems\beige\beigeTracker.js:34:18)
+    at async processGuildBeige (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:37:26)
+    at async checkBeigeExits (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:26:7)
+    at async Task._execution (C:\Users\hp\Desktop\pw-bot\src\jobs\scheduler.js:32:5)
+[2026-06-27 08:06:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:06:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:07:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:07:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:08:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:08:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:09:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:09:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:10:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:10:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:10:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:10:00] ERROR: Error fetching beige targets: getaddrinfo ENOTFOUND api.politicsandwar.com
+Error: getaddrinfo ENOTFOUND api.politicsandwar.com
+    at AxiosError.from (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:1355:24)
+    at RedirectableRequest.handleRequestError (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:4082:25)
+    at RedirectableRequest.emit (node:events:520:35)
+    at eventHandlers.<computed> (C:\Users\hp\Desktop\pw-bot\node_modules\follow-redirects\index.js:56:24)
+    at ClientRequest.emit (node:events:508:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at TLSSocket.socketErrorListener (node:_http_client:575:5)
+    at TLSSocket.emit (node:events:520:35)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (C:\Users\hp\Desktop\pw-bot\node_modules\axios\dist\node\axios.cjs:5517:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async pwQuery (C:\Users\hp\Desktop\pw-bot\src\utils\pwApi.js:23:17)
+    at async getBeigeTargets (C:\Users\hp\Desktop\pw-bot\src\systems\beige\beigeTracker.js:34:18)
+    at async processGuildBeige (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:37:26)
+    at async checkBeigeExits (C:\Users\hp\Desktop\pw-bot\src\jobs\beigeJob.js:26:7)
+    at async Task._execution (C:\Users\hp\Desktop\pw-bot\src\jobs\scheduler.js:32:5)
+[2026-06-27 08:11:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:11:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:12:00] ERROR: P&W API HTTP error: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:12:00] ERROR: Defense monitor error for guild 1394283356459503737: getaddrinfo ENOTFOUND api.politicsandwar.com
+[2026-06-27 08:13:29] ERROR: Error in /war: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000 Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+DiscordAPIError[50035]: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SequentialHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1163:23)
+    at async SequentialHandler.queueRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:994:14)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async InteractionWebhook.editMessage (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\Webhook.js:351:15)
+    at async ChatInputCommandInteraction.editReply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:247:17)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:157:7)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:33:9)
+[2026-06-27 08:13:58] ERROR: Error in /war: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000 Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+DiscordAPIError[50035]: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SequentialHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1163:23)
+    at async SequentialHandler.queueRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:994:14)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async InteractionWebhook.editMessage (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\Webhook.js:351:15)
+    at async ChatInputCommandInteraction.editReply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:247:17)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\war.js:157:7)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:33:9)
+[2026-06-27 08:35:02] ERROR: P&W API HTTP error: write EPROTO BC250000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 51
+
+[2026-06-27 08:35:03] ERROR: Defense monitor error for guild 1394283356459503737: write EPROTO BC250000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 51
+
+[2026-06-27 08:41:01] ERROR: P&W API HTTP error: 3C3C0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 20
+
+[2026-06-27 08:41:01] ERROR: Defense monitor error for guild 1394283356459503737: 3C3C0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 20
+
+[2026-06-30 08:57:46] ERROR: Failed to send mass attack alert: Received one or more errors
+[2026-06-30 08:58:39] ERROR: Error in /help: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000 Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+DiscordAPIError[50035]: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async BurstHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:866:23)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async ChatInputCommandInteraction.reply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:193:22)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:32:9)
+[2026-06-30 09:00:29] ERROR: Failed to create war room: other side closed
+[2026-06-30 09:07:12] ERROR: Error in /help: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000 Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+DiscordAPIError[50035]: Invalid Form Body
+embeds[MAX_EMBED_SIZE_EXCEEDED]: Embed size exceeds maximum size of 6000
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async BurstHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:866:23)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async ChatInputCommandInteraction.reply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:193:22)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:32:9)
+[2026-08-26 02:57:57] ERROR: ❌ Failed to start bot: B02E0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+Error: B02E0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-26 02:59:27] ERROR: P&W API HTTP error: 94230000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-26 02:59:27] ERROR: Treaty sync error: 94230000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-26 03:02:18] ERROR: Error in /backup: other side closed other side closed
+SocketError: other side closed
+    at TLSSocket.<anonymous> (C:\Users\hp\Desktop\pw-bot\node_modules\undici\lib\dispatcher\client-h1.js:701:24)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+[2026-08-26 03:32:09] ERROR: DB query error:
+[2026-08-26 03:32:09] ERROR: SQL:
+[2026-08-26 03:32:09] ERROR: Error in /backup: no such table: coalition no such table: coalition
+Error: no such table: coalition
+    at e.handleError (C:\Users\hp\Desktop\pw-bot\node_modules\sql.js\dist\sql-wasm.js:90:192)
+    at e.tb (C:\Users\hp\Desktop\pw-bot\node_modules\sql.js\dist\sql-wasm.js:88:454)
+    at query (C:\Users\hp\Desktop\pw-bot\src\utils\database.js:69:21)
+    at buildBackup (C:\Users\hp\Desktop\pw-bot\src\commands\admin\backup.js:29:26)
+    at Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\admin\backup.js:183:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:25:9)
+[2026-08-26 09:17:18] ERROR: Error in /backup: other side closed other side closed
+SocketError: other side closed
+    at TLSSocket.<anonymous> (C:\Users\hp\Desktop\pw-bot\node_modules\undici\lib\dispatcher\client-h1.js:701:24)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+[2026-08-30 08:46:50] ERROR: DB query error:
+[2026-08-30 08:46:50] ERROR: SQL:
+[2026-08-30 08:51:06] ERROR: War room error: Invalid Form Body
+parent_id[CHANNEL_PARENT_MAX_CHANNELS]: Maximum number of channels in category reached (50)
+[2026-08-30 09:12:20] ERROR: DB query error:
+[2026-08-30 09:12:20] ERROR: SQL:
+[2026-08-30 09:14:02] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:14:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:15:40] ERROR: P&W API HTTP error: E8320000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-30 09:16:00] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:01] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:16:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:01] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:18:12] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:12] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:12] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:20:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:14] ERROR: P&W API HTTP error: E8320000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-30 09:22:14] ERROR: fetchNewAttacks: E8320000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-30 09:22:16] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:16] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:18] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:19] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:20] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:20] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:20] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:21] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:21] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:22] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:23] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:24] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:26] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:26] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:26] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:27] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:27] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:28] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:29] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:29] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:30] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:22:31] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:14] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:16] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:16] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:17] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:18] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:20] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:21] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:22] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:22] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:24:23] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:03] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:12] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:12] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:14] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:14] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:15] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:15] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:16] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:17] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:26:18] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:04] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:05] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:06] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:07] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:08] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:09] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:10] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:11] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:12] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:13] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:14] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:14] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:15] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:15] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:15] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 09:28:16] ERROR: processRoomAttacks: successOutcome.includes is not a function
+[2026-08-30 14:14:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-08-30 14:14:15] ERROR: War monitor error for guild 1394283356459503737: timeout of 15000ms exceeded
+[2026-08-30 14:14:15] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-08-30 14:14:15] ERROR: fetchNewAttacks: timeout of 15000ms exceeded
+[2026-08-30 14:14:30] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-08-30 14:14:30] ERROR: fetchNewAttacks: timeout of 15000ms exceeded
+[2026-08-30 14:15:17] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-08-30 14:15:17] ERROR: fetchNewAttacks: timeout of 15000ms exceeded
+[2026-08-30 14:15:17] ERROR: P&W API HTTP error: timeout of 15000ms exceeded
+[2026-08-30 18:54:42] ERROR: Error in /backup: Interaction has already been acknowledged. Interaction has already been acknowledged.
+DiscordAPIError[40060]: Interaction has already been acknowledged.
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async BurstHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:866:23)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async ChatInputCommandInteraction.deferReply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:122:22)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\admin\backup.js:205:7)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:26:9)
+[2026-08-30 18:54:57] ERROR: Error in /warroom: Interaction has already been acknowledged. Interaction has already been acknowledged.
+DiscordAPIError[40060]: Interaction has already been acknowledged.
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async BurstHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:866:23)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async ChatInputCommandInteraction.reply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:193:22)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:26:9)
+[2026-08-30 18:55:05] ERROR: Error in /warroom: Interaction has already been acknowledged. Interaction has already been acknowledged.
+DiscordAPIError[40060]: Interaction has already been acknowledged.
+    at handleErrors (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async BurstHandler.runRequest (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:866:23)
+    at async _REST.request (C:\Users\hp\Desktop\pw-bot\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async ChatInputCommandInteraction.deferReply (C:\Users\hp\Desktop\pw-bot\node_modules\discord.js\src\structures\interfaces\InteractionResponses.js:122:22)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\commands\military\warroom.js:75:7)
+    at async Object.execute (C:\Users\hp\Desktop\pw-bot\src\events\interactionCreate.js:26:9)
+[2026-08-30 19:13:00] ERROR: P&W API HTTP error: write EPROTO 94470000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 51
+
+[2026-08-30 19:13:00] ERROR: fetchNewAttacks: write EPROTO 94470000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 51
+
+[2026-08-31 01:58:03] ERROR: P&W API HTTP error: B82B0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-31 01:58:03] ERROR: fetchNewAttacks: B82B0000:error:0A0003FC:SSL routines:ssl3_read_bytes:ssl/tls alert bad record mac:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 20
+
+[2026-08-31 02:04:00] ERROR: P&W API HTTP error: write EPROTO B82B0000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 51
+
+[2026-08-31 02:04:00] ERROR: War monitor error for guild 1394283356459503737: write EPROTO B82B0000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 51
+
+[2026-08-31 02:07:00] ERROR: P&W API HTTP error: write EPROTO B82B0000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 51
+
+[2026-08-31 02:07:00] ERROR: fetchNewAttacks: write EPROTO B82B0000:error:0A00041B:SSL routines:ssl3_read_bytes:tlsv1 alert decrypt error:c:\ws\deps\openssl\openssl\ssl\record\rec_layer_s3.c:918:SSL alert number 51
+
+[2026-08-31 02:16:58] ERROR: Error in /warroom: other side closed other side closed
+SocketError: other side closed
+    at TLSSocket.<anonymous> (C:\Users\hp\Desktop\pw-bot\node_modules\undici\lib\dispatcher\client-h1.js:701:24)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
