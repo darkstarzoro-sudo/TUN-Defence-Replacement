@@ -257,7 +257,16 @@ async function processRoomAttacks(client, room) {
         const report = buildAttackReport(attack, ctx);
         const payload = { content: report.text };
         if (report.gifUrl) payload.embeds = [new EmbedBuilder().setImage(report.gifUrl)];
-        await channel.send(payload).catch(()=>{});
+        try {
+          await channel.send(payload);
+        } catch (sendErr) {
+          // Do NOT mark this attack as reported — the send genuinely failed
+          // (often a transient Discord network blip). Stop here so this
+          // attack (and anything after it) gets retried in order on the
+          // next 1-minute cycle instead of being silently lost.
+          logger.error(`Failed to send attack report (attack ${attack.id}, war ${war_id}): ${sendErr.message}`);
+          break;
+        }
         run(`INSERT INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'war_attack_last',?,?) ON CONFLICT(guild_id,alert_type,setting_key) DO UPDATE SET setting_value=excluded.setting_value`,
           [room.guild_id, String(war_id), String(attack.id)]);
       }
