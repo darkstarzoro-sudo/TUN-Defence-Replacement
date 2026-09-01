@@ -263,10 +263,46 @@ function addWarRoomTables() {
         war_room_id INTEGER NOT NULL, discord_user_id TEXT,
         nation_id INTEGER, nation_name TEXT, war_id INTEGER,
         joined_at TEXT DEFAULT (datetime('now')),
-        UNIQUE(war_room_id, nation_id)
+        UNIQUE(war_room_id, war_id)
       );
     `);
   } catch (err) {}
+  migrateWarRoomMembersUnique();
+}
+
+// One-time migration for databases created before this fix: the old
+// UNIQUE(war_room_id, nation_id) constraint silently blocked a member from
+// ever being tracked again if they started a NEW, separate war against the
+// same enemy later on (their row already "existed" from the old war, so the
+// INSERT OR IGNORE for the new war_id did nothing) — no card, no attack
+// reports, for that member's new war. SQLite can't alter a UNIQUE constraint
+// in place, so this recreates the table with the corrected constraint and
+// copies existing rows over. Safe to run every startup — it's a no-op once
+// already migrated (detected via the marker table below).
+function migrateWarRoomMembersUnique() {
+  if (!db) return;
+  try {
+    const alreadyDone = db.exec(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='war_room_members_migrated_v2'`);
+    if (alreadyDone.length > 0 && alreadyDone[0].values.length > 0) return;
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS war_room_members_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        war_room_id INTEGER NOT NULL, discord_user_id TEXT,
+        nation_id INTEGER, nation_name TEXT, war_id INTEGER,
+        joined_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(war_room_id, war_id)
+      );
+      INSERT OR IGNORE INTO war_room_members_new (id,war_room_id,discord_user_id,nation_id,nation_name,war_id,joined_at)
+        SELECT id,war_room_id,discord_user_id,nation_id,nation_name,war_id,joined_at FROM war_room_members;
+      DROP TABLE war_room_members;
+      ALTER TABLE war_room_members_new RENAME TO war_room_members;
+      CREATE TABLE war_room_members_migrated_v2 (done INTEGER);
+    `);
+    saveDatabase();
+  } catch (err) {
+    logger.error(`migrateWarRoomMembersUnique: ${err.message}`);
+  }
 }
 
 module.exports = { connectDatabase, query, run, queryOne, saveDatabase, addPhase6Tables, addPhase7Tables, addPhase9Tables, addPhase10Tables, addPhase12Tables, addNationLinksTable, addSpyTables, addDnrTable };
