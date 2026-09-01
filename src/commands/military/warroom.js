@@ -116,7 +116,7 @@ module.exports = {
 
       const discordMap = buildNationToDiscordMap(interaction.guildId);
       const guild      = interaction.guild;
-      let created = 0, existing = 0, skipped = 0, inactive = 0;
+      let created = 0, existing = 0, skipped = 0, inactive = 0, addedToExisting = 0;
       const errors = [];
 
       for (const war of warsToProcess) {
@@ -129,7 +129,14 @@ module.exports = {
           if (!MEMBER_POSITIONS.includes((ourNation.alliance_position || '').toUpperCase())) { skipped++; continue; }
 
           const existingRoom = queryOne('SELECT id FROM war_rooms WHERE guild_id=? AND enemy_nation_id=? AND status=?', [interaction.guildId, enemyNation.id, 'active']);
-          if (existingRoom) { existing++; continue; }
+          // Only skip if THIS SPECIFIC war is already tracked in that room —
+          // not just because a room exists for the enemy. A room existing
+          // only means at least one of our members is already fighting this
+          // enemy; a second/third member with a DIFFERENT war_id against the
+          // same enemy still needs to be added via getOrCreateWarRoom below
+          // (which correctly routes to addMemberToWarRoom for an existing room).
+          const alreadyTrackedThisWar = existingRoom && queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND war_id=?', [existingRoom.id, war.id]);
+          if (alreadyTrackedThisWar) { existing++; continue; }
 
           if (isInactiveNation(enemyNation.last_active)) { inactive++; continue; }
 
@@ -158,7 +165,9 @@ module.exports = {
           };
 
           const result = await getOrCreateWarRoom(interaction.client, guild, interaction.guildId, enemyNation, ourDiscordId, ourNation.nation_name, enrichedWar, counterResult.isCounter, counterResult.detail);
-          if (result) created++; else skipped++;
+          if (result && existingRoom) addedToExisting++;
+          else if (result) created++;
+          else skipped++;
 
           await new Promise(r => setTimeout(r, 1500));
         } catch (err) {
@@ -169,10 +178,11 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setTitle('✅ War Room Sync Complete')
-        .setColor(created > 0 ? 0x2ecc71 : 0x95a5a6)
+        .setColor((created + addedToExisting) > 0 ? 0x2ecc71 : 0x95a5a6)
         .addFields(
-          { name: '🆕 Created',          value: `${created}`,  inline: true },
-          { name: '✅ Already Existed',  value: `${existing}`, inline: true },
+          { name: '🆕 New Rooms',        value: `${created}`,  inline: true },
+          { name: '➕ Added as Member',  value: `${addedToExisting}`, inline: true },
+          { name: '✅ Already Tracked',  value: `${existing}`, inline: true },
           { name: '💤 Skipped (inactive 5d+)', value: `${inactive}`, inline: true },
           { name: '⏭️ Skipped (other)',   value: `${skipped}`,  inline: true },
           { name: '📊 Wars Scanned',     value: `${defWars.length} def + ${offWars.length} off = **${warsToProcess.length}**`, inline: false },
