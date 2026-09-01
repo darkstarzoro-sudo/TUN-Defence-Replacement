@@ -25,6 +25,18 @@ async function main() {
   try {
     logger.info('Starting PW Defense Bot...');
 
+    // Give Railway's volume mount a moment to fully attach before we touch
+    // the database path. Without this, there's a race where the app can
+    // start and create/write its database file on the container's ephemeral
+    // local disk a moment BEFORE the persistent volume finishes mounting
+    // over that same path — meaning every restart looks like a fresh
+    // install ("Created new database") even with a volume correctly
+    // attached, because the existence check ran too early to see it.
+    if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+      logger.info('Waiting for volume mount to settle...');
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
     // Step 1: Connect to database (sql.js needs await)
     await connectDatabase();
     logger.info('✅ Database ready');
