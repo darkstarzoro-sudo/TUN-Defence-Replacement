@@ -42,49 +42,133 @@ async function closeWarRoomForInactivity(client, guild, room, daysInactive) {
   } catch (err) { logger.error(`closeWarRoomForInactivity: ${err.message}`); }
 }
 
-function buildWarCard(war, ourMember, enemyNation, assignedTo=null, isCounter=false, counterDetail=null) {
-  const color   = war.isOurAttack ? 0x3498db : 0xe74c3c;
-  const typeTag = isCounter ? '🔄 **COUNTER WAR**' : war.isOurAttack ? '⚔️ **OFFENSIVE WAR**' : '🛡️ **DEFENSIVE WAR**';
+// ── UNIFIED WAR CARD ──────────────────────────────────────────
+// One card per ROOM (not per member) listing every one of our members
+// currently fighting this enemy, followed by the enemy's overview.
+// Rebuilt from scratch (fresh data for everyone) on every refresh — so any
+// member clicking Refresh updates the whole room's picture, not just theirs.
+//
+// Discord hard limits respected here: 25 fields/embed, ~6000 chars/embed,
+// 10 embeds/message. If a room somehow has more members than fits even
+// after paginating into 10 embeds, remaining members are dropped from the
+// card with a visible warning message instead of crashing or truncating
+// silently — see the `overflowed` handling in sendUnifiedWarCard.
+const EMBED_FIELD_LIMIT = 24; // leave 1 slot of buffer per page
+const EMBED_CHAR_BUDGET = 5500; // buffer under Discord's hard 6000 cap
+const MAX_EMBEDS_PER_MESSAGE = 10;
 
-  return new EmbedBuilder()
-    .setTitle(`${typeTag} — vs ${enemyNation?.nation_name||'Unknown'}`)
-    .setColor(color)
-    .setDescription((isCounter&&counterDetail?`✅ _${counterDetail}_\n\n`:'')+`[View War](https://politicsandwar.com/nation/war/timeline/war=${war.id})`)
-    .addFields(
-      {
-        name: `🛡️ Our Member — ${ourMember?.nation_name||'Unknown'}`,
-        value: [
-          `⭐ NS: **${Math.round(ourMember?.score||0).toLocaleString()}** | 🏙️ Cities: **${ourMember?.num_cities||'?'}**`,
-          `👮 ${(ourMember?.soldiers||0).toLocaleString()} | 🚗 ${(ourMember?.tanks||0).toLocaleString()} | ✈️ ${ourMember?.aircraft||0} | 🚢 ${ourMember?.ships||0}`,
-          `🚀 ${ourMember?.missiles||0} | ☢️ ${ourMember?.nukes||0} | 🕵️ ${ourMember?.spies||0}`,
-          `❤️ Resistance: **${war.ourResistance??'?'}/100**`,
-        ].join('\n'),
-        inline: false,
-      },
-      {
-        name: `⚔️ Enemy — [${enemyNation?.nation_name||'Unknown'}](https://politicsandwar.com/nation/id=${enemyNation?.id}) (${enemyNation?.alliance?.name||'None'})`,
-        value: [
-          `⭐ NS: **${Math.round(enemyNation?.score||0).toLocaleString()}** | 🏙️ Cities: **${enemyNation?.num_cities||'?'}**`,
-          `👮 ${(enemyNation?.soldiers||0).toLocaleString()} | 🚗 ${(enemyNation?.tanks||0).toLocaleString()} | ✈️ ${enemyNation?.aircraft||0} | 🚢 ${enemyNation?.ships||0}`,
-          `🚀 ${enemyNation?.missiles||0} | ☢️ ${enemyNation?.nukes||0} | 🕵️ ${enemyNation?.spies||0}`,
-          `❤️ Resistance: **${war.enemyResistance??'?'}/100**`,
-        ].join('\n'),
-        inline: false,
-      },
-      { name: '⏳ War Status', value: `Turns Left: **${war.turnsleft??'?'}** | War ID: \`${war.id}\`\n_MAP values — check war page_`, inline: false },
-    )
-    .setTimestamp()
-    .setFooter({ text: assignedTo?`Director: @${assignedTo}`:'No director — click Claim to take command' });
+async function buildUnifiedWarCards(room) {
+  const members = query('SELECT * FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
+  if (members.length === 0) return { embeds: [], components: [], overflowed: false, totalMembers: 0 };
+
+  const enemyData = await fetchNationData(room.enemy_nation_id);
+
+  const memberResults = await Promise.all(members.map(async (m) => {
+    const [warData, ourData] = await Promise.all([
+      fetchWarData(m.war_id, m.nation_id, room.enemy_nation_id),
+      fetchNationData(m.nation_id),
+    ]);
+    return { member: m, warData, ourData };
+  }));
+
+  const memberFields = memberResults.map(({ member, warData, ourData }) => {
+    const name = `🛡️ ${member.discord_user_id ? `<@${member.discord_user_id}> — ` : ''}${ourData?.nation_name || member.nation_name || 'Unknown'}`;
+    const value = [
+      `⭐ NS: **${Math.round(ourData?.score||0).toLocaleString()}** | 🏙️ Cities: **${ourData?.num_cities??'?'}**`,
+      `👮 ${(ourData?.soldiers||0).toLocaleString()} | 🚗 ${(ourData?.tanks||0).toLocaleString()} | ✈️ ${ourData?.aircraft||0} | 🚢 ${ourData?.ships||0}`,
+      `🚀 ${ourData?.missiles||0} | ☢️ ${ourData?.nukes||0} | 🕵️ ${ourData?.spies||0}`,
+      `❤️ Resistance: **${warData?.ourResistance??'?'}/100** (enemy: **${warData?.enemyResistance??'?'}/100**) | ⏳ Turns Left: **${warData?.turnsleft??'?'}**`,
+      `[View This War](https://politicsandwar.com/nation/war/timeline/war=${member.war_id})`,
+    ].join('\n');
+    return { name: name.slice(0,256), value: value.slice(0,1024), inline: false };
+  });
+
+  const enemyField = {
+    name: `⚔️ Enemy — [${enemyData?.nation_name||room.enemy_nation_name||'Unknown'}](https://politicsandwar.com/nation/id=${room.enemy_nation_id}) (${enemyData?.alliance?.name||room.enemy_alliance_name||'None'})`,
+    value: [
+      `⭐ NS: **${Math.round(enemyData?.score||0).toLocaleString()}** | 🏙️ Cities: **${enemyData?.num_cities??'?'}**`,
+      `👮 ${(enemyData?.soldiers||0).toLocaleString()} | 🚗 ${(enemyData?.tanks||0).toLocaleString()} | ✈️ ${enemyData?.aircraft||0} | 🚢 ${enemyData?.ships||0}`,
+      `🚀 ${enemyData?.missiles||0} | ☢️ ${enemyData?.nukes||0} | 🕵️ ${enemyData?.spies||0}`,
+      `_Resistance is per-war and shown against each member above — the enemy doesn't have one shared resistance number._`,
+    ].join('\n'),
+    inline: false,
+  };
+
+  // ── Paginate member fields to stay under Discord's per-embed limits ──
+  const pages = [];
+  let currentFields = [], currentChars = 0;
+  for (const field of memberFields) {
+    const fieldChars = field.name.length + field.value.length;
+    if (currentFields.length >= EMBED_FIELD_LIMIT || currentChars + fieldChars > EMBED_CHAR_BUDGET) {
+      pages.push(currentFields);
+      currentFields = []; currentChars = 0;
+    }
+    currentFields.push(field);
+    currentChars += fieldChars;
+  }
+  const enemyFieldChars = enemyField.name.length + enemyField.value.length;
+  if (currentFields.length < EMBED_FIELD_LIMIT + 1 && currentChars + enemyFieldChars <= EMBED_CHAR_BUDGET) {
+    currentFields.push(enemyField);
+    pages.push(currentFields);
+  } else {
+    if (currentFields.length > 0) pages.push(currentFields);
+    pages.push([enemyField]);
+  }
+
+  const overflowed = pages.length > MAX_EMBEDS_PER_MESSAGE;
+  const usablePages = overflowed ? pages.slice(0, MAX_EMBEDS_PER_MESSAGE) : pages;
+
+  const embeds = usablePages.map((fields, idx) => {
+    const embed = new EmbedBuilder().setColor(0x3498db).addFields(fields).setTimestamp();
+    if (idx === 0) embed.setTitle(`⚔️ War Room — ${members.length} Member${members.length===1?'':'s'} vs ${room.enemy_nation_name||'Unknown'}`);
+    if (usablePages.length > 1) embed.setFooter({ text: `Page ${idx+1}/${usablePages.length}` });
+    return embed;
+  });
+
+  const components = [buildWarButtons(room.id), ...buildMemberLinkButtons(members)];
+
+  return { embeds, components, overflowed, totalMembers: members.length, shownPages: usablePages.length, totalPages: pages.length };
 }
 
-function buildWarButtons(warId) {
+function buildMemberLinkButtons(members) {
+  const rows = [];
+  for (let i = 0; i < members.length && rows.length < 4; i += 5) { // max 4 extra rows (+1 action row = Discord's 5-row cap)
+    const chunk = members.slice(i, i + 5);
+    rows.push(new ActionRowBuilder().addComponents(
+      chunk.map(m => new ButtonBuilder()
+        .setLabel(`🔗 ${(m.nation_name||'War').slice(0,25)}`)
+        .setStyle(ButtonStyle.Link)
+        .setURL(`https://politicsandwar.com/nation/war/timeline/war=${m.war_id}`))
+    ));
+  }
+  return rows;
+}
+
+function buildWarButtons(roomId) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`war_claim_${warId}`).setLabel('🎖️ Claim').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`war_status_${warId}`).setLabel('📊 War Status').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`war_counter_${warId}`).setLabel('⚔️ Counter').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`war_spies_${warId}`).setLabel('🕵️ Spies').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setLabel('🔗 View War').setStyle(ButtonStyle.Link).setURL(`https://politicsandwar.com/nation/war/timeline/war=${warId}`),
+    new ButtonBuilder().setCustomId(`war_claim_${roomId}`).setLabel('🎖️ Claim').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`war_status_${roomId}`).setLabel('🔄 Refresh').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`war_counter_${roomId}`).setLabel('⚔️ Counter').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`war_spies_${roomId}`).setLabel('🕵️ Spies').setStyle(ButtonStyle.Secondary),
   );
+}
+
+async function sendUnifiedWarCard(channel, room) {
+  try {
+    if (room.card_message_id) {
+      const oldMsg = await channel.messages.fetch(room.card_message_id).catch(()=>null);
+      if (oldMsg) await oldMsg.delete().catch(()=>{});
+    }
+    const { embeds, components, overflowed, totalMembers, shownPages, totalPages } = await buildUnifiedWarCards(room);
+    if (embeds.length === 0) return null;
+    const newMsg = await channel.send({ embeds, components });
+    await newMsg.pin().catch(()=>{});
+    run('UPDATE war_rooms SET card_message_id=? WHERE id=?', [newMsg.id, room.id]);
+    if (overflowed) {
+      await channel.send({ content: `⚠️ This war room has **${totalMembers} members** — too many to fit on one card (Discord's embed limit). Showing ${shownPages} of ${totalPages} pages; the rest aren't displayed. Consider using \`/war\` to look up individual members not shown here.` }).catch(()=>{});
+    }
+    return newMsg;
+  } catch (err) { logger.error(`sendUnifiedWarCard: ${err.message}`); return null; }
 }
 
 async function fetchWarData(warId, ourNationId, enemyNationId) {
@@ -328,25 +412,10 @@ async function sendWarAttacks(client, room, war_id, ctx, attacks) {
   } catch (err) { logger.error(`sendWarAttacks: ${err.message}`); }
 }
 
-async function sendOrRefreshWarCard(channel, room, warData, ourData, enemyData, director, isCounter, counterDetail) {
-  try {
-    if (room.card_message_id) {
-      const oldMsg = await channel.messages.fetch(room.card_message_id).catch(()=>null);
-      if (oldMsg) await oldMsg.delete().catch(()=>{});
-    }
-    const embed   = buildWarCard(warData||{id:room.enemy_nation_id,isOurAttack:true,turnsleft:'?'}, ourData||{nation_name:'Our Member'}, enemyData||{id:room.enemy_nation_id,nation_name:room.enemy_nation_name,alliance:{name:room.enemy_alliance_name}}, director, isCounter||false, counterDetail||null);
-    const buttons = buildWarButtons(warData?.id||room.enemy_nation_id);
-    const newMsg  = await channel.send({ embeds:[embed], components:[buttons] });
-    await newMsg.pin().catch(()=>{});
-    run('UPDATE war_rooms SET card_message_id=? WHERE id=?', [newMsg.id, room.id]);
-    return newMsg;
-  } catch (err) { logger.error(`sendOrRefreshWarCard: ${err.message}`); return null; }
-}
-
 async function getOrCreateWarRoom(client, guild, guildId, enemyNation, ourDiscordId, ourMemberName, war, isCounter, counterDetail) {
   try {
     const existing = queryOne('SELECT * FROM war_rooms WHERE guild_id=? AND enemy_nation_id=? AND status=?', [guildId, enemyNation.id, 'active']);
-    if (existing) { await addMemberToWarRoom(client, guild, guildId, existing, ourDiscordId, ourMemberName, war); return existing; }
+    if (existing) { await addMemberToWarRoom(client, guild, guildId, existing, ourDiscordId, ourMemberName, war, isCounter, counterDetail); return existing; }
     return await createWarRoom(client, guild, guildId, enemyNation, ourDiscordId, ourMemberName, war, isCounter, counterDetail);
   } catch (err) { logger.error(`War room error: ${err.message}`); }
 }
@@ -391,22 +460,31 @@ async function createWarRoom(client, guild, guildId, enemyNation, ourDiscordId, 
   const link = ourDiscordId ? `<@${ourDiscordId}>` : `**${ourMemberName}**`;
   await channel.send({ content:`${link} joined the fray! ⚔️`+(isCounter?`\n🔄 **COUNTER WAR** — _${counterDetail}_`:'') });
 
-  const [warData, ourData] = await Promise.all([fetchWarData(war.id, war.ourNationId, enemyNation.id), fetchNationData(war.ourNationId)]);
   const roomFull = queryOne('SELECT * FROM war_rooms WHERE id=?', [roomId]);
-  await sendOrRefreshWarCard(channel, roomFull, warData||{...war,isOurAttack:!isCounter}, ourData||{nation_name:ourMemberName}, enemyNation, null, isCounter, counterDetail);
+  await sendUnifiedWarCard(channel, roomFull);
 
   logger.info(`War room created: ${channel.name} for war ${war.id}`);
   return { id:roomId, channel_id:channel.id };
 }
 
-async function addMemberToWarRoom(client, guild, guildId, roomRow, ourDiscordId, ourMemberName, war) {
+// Adds ANOTHER of our members to an already-existing war room against this
+// same enemy. Previously this only sent a plain-text line and never gave
+// the new member their own war card — the unified card fixes that by
+// rebuilding the WHOLE room's card (now including this member) instead.
+// Deduped by war_id, not discord_user_id: the same member can legitimately
+// start a brand new, separate war against this same enemy later on
+// (declare, peace out, redeclare) — deduping by member alone silently
+// dropped that new war from tracking entirely, which is why some members'
+// attacks were never reported.
+async function addMemberToWarRoom(client, guild, guildId, roomRow, ourDiscordId, ourMemberName, war, isCounter, counterDetail) {
   const channel = guild.channels.cache.get(roomRow.channel_id);
   if (!channel) return;
-  const already = queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND discord_user_id=?', [roomRow.id, ourDiscordId]);
+  const already = queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND war_id=?', [roomRow.id, war.id]);
   if (already) return;
   run(`INSERT OR IGNORE INTO war_room_members (war_room_id,discord_user_id,nation_id,nation_name,war_id) VALUES(?,?,?,?,?)`, [roomRow.id,ourDiscordId,war.ourNationId,ourMemberName,war.id]);
   if (ourDiscordId) await channel.permissionOverwrites.create(ourDiscordId, {ViewChannel:true,SendMessages:true}).catch(()=>{});
-  await channel.send({ content:`${ourDiscordId?`<@${ourDiscordId}>`:`**${ourMemberName}**`} also joined the fray! ⚔️` });
+  await channel.send({ content:`${ourDiscordId?`<@${ourDiscordId}>`:`**${ourMemberName}**`} also joined the fray! ⚔️`+(isCounter?`\n🔄 **COUNTER WAR** — _${counterDetail}_`:'') });
+  await sendUnifiedWarCard(channel, roomRow);
 }
 
 async function removeMemberFromWarRoom(client, guild, guildId, nationId, warId) {
@@ -427,4 +505,4 @@ async function removeMemberFromWarRoom(client, guild, guildId, nationId, warId) 
   } catch (err) { logger.error(`removeMemberFromWarRoom: ${err.message}`); }
 }
 
-module.exports = { getOrCreateWarRoom, removeMemberFromWarRoom, buildWarCard, buildWarButtons, fetchWarData, fetchNationData, sendOrRefreshWarCard, checkWarRoomAttacks, isInactiveNation, daysSinceActive, closeWarRoomForInactivity, INACTIVITY_DAYS };
+module.exports = { getOrCreateWarRoom, removeMemberFromWarRoom, buildWarButtons, fetchWarData, fetchNationData, sendUnifiedWarCard, checkWarRoomAttacks, isInactiveNation, daysSinceActive, closeWarRoomForInactivity, INACTIVITY_DAYS };
