@@ -35,17 +35,17 @@ const MISSILE_GIF     = 'https://i.ibb.co/9MD2Zxs/In-Shot-20260831-123928524.gif
 const MISSILE_FAIL_GIF= 'https://i.ibb.co/QFsFQH23/ezgif-com-crop-3.gif';                  // missile utter failure / intercepted
 const NUKE_GIF        = 'https://i.ibb.co/RpP5fFB4/d75784-56c70b35d16549ff87ecdea76d588e79-mv2.gif'; // successful nuke launch
 const NUKE_FAIL_GIF   = 'https://i.ibb.co/sdy4GPSb/In-Shot-20260831-144508703.gif';        // nuke utter failure / intercepted
+const AIRVGROUND_GIF  = 'https://i.ibb.co/4gs5F5rq/In-Shot-20260901-041723412.gif';        // airstrikes on soldiers and tanks
 
 // ── Not yet replaced — verified real-footage Giphy links from before ──
-const AIR_GIF         = 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMHBiaWo2aGZwODg2OGRzY2Y0N3A2eHQ0b2Ywam5sZnl5dTI4MHduYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/FM1IpHNuddx4s/giphy.gif'; // real USAF T-38 jet footage — used for AIRVSOLDIERS/AIRVTANKS only (not covered by the ships/money/infra GIF above)
 const FORTIFY_GIF     = 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3dyaDZqbXJjMGwyMDRoNTN3M2tkYTRkZnk0dmd5aXNtb2xwZHNxcyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vR80tqnUBaZx50A/giphy.gif'; // best-effort match, not a perfect thematic fit
 const PEACE_GIF       = 'https://media1.tenor.com/m/ObWFgyjIM4QAAAAd/peace-dove.gif'; // not yet re-verified as a Giphy link; flag if this fails to render
 
 const GIFS = {
   GROUND:       { default: [GROUND_GIF] },
   AIRVINFRA:    { default: [AIRSTRIKE_GIF] },
-  AIRVSOLDIERS: { default: [AIR_GIF] },
-  AIRVTANKS:    { default: [AIR_GIF] },
+  AIRVSOLDIERS: { default: [AIRVGROUND_GIF] },
+  AIRVTANKS:    { default: [AIRVGROUND_GIF] },
   AIRVMONEY:    { default: [AIRSTRIKE_GIF] },
   AIRVSHIPS:    { default: [AIRSTRIKE_GIF] },
   AIRVAIR:      { default: [DOGFIGHT_GIF] },

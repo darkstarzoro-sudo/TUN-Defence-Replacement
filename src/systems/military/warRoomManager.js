@@ -122,9 +122,22 @@ async function fetchNationData(nationId) {
 }
 
 async function fetchNewAttacks(warId, lastAttackId) {
+  const attacks = await fetchAttacksBatch([warId]);
+  if (!lastAttackId) return attacks;
+  return attacks.filter(a => parseInt(a.id) > parseInt(lastAttackId));
+}
+
+// Fetches attacks for MULTIPLE wars in a single API call. Politics & War's
+// API has a hard DAILY quota (2,000/day standard, 5,000/day VIP) — it is
+// NOT a per-minute limit. Querying once per war-room-member (the old
+// behavior) burns through that quota multiple times faster than necessary
+// for zero benefit, since one query can cover every active war at once.
+async function fetchAttacksBatch(warIds) {
+  const ids = [...new Set(warIds.map(id => parseInt(id)).filter(Boolean))];
+  if (ids.length === 0) return [];
   try {
     const data = await pwQuery(`
-      query A($warId:[Int]){warattacks(war_id:$warId,orderBy:{column:ID,order:DESC},first:20){data{
+      query A($warId:[Int]){warattacks(war_id:$warId,orderBy:{column:ID,order:DESC},first:100){data{
         id war_id attid defid
         type victor success
         att_mun_used def_mun_used att_gas_used def_gas_used
@@ -133,11 +146,9 @@ async function fetchNewAttacks(warId, lastAttackId) {
         att_aircraft_lost def_aircraft_lost att_ships_lost def_ships_lost
         date
       }}}
-    `, { warId:[parseInt(warId)] });
-    const attacks = data?.warattacks?.data||[];
-    if (!lastAttackId) return attacks;
-    return attacks.filter(a => parseInt(a.id) > parseInt(lastAttackId));
-  } catch (err) { logger.error(`fetchNewAttacks: ${err.message}`); return []; }
+    `, { warId: ids });
+    return data?.warattacks?.data || [];
+  } catch (err) { logger.error(`fetchAttacksBatch: ${err.message}`); return []; }
 }
 
 // WarAttack.success is returned as an Int by the P&W API (confirmed by a live
@@ -245,44 +256,76 @@ function buildAttackReport(attack, ctx={}) {
 
 async function checkWarRoomAttacks(client) {
   const rooms = query(`SELECT wr.* FROM war_rooms wr WHERE wr.status='active'`, []).rows;
-  for (const room of rooms) await processRoomAttacks(client, room);
+  if (rooms.length === 0) return;
+
+  // Build war_id -> { room, ctx } once, then fetch every active war's
+  // attacks in a SINGLE API call (see fetchAttacksBatch) instead of one
+  // call per room-member — this is what actually frees up headroom to
+  // poll more often within P&W's daily request quota.
+  const warMap = new Map(); // war_id -> { room, ctx }
+  for (const room of rooms) {
+    const members = query('SELECT DISTINCT war_id, nation_id, nation_name FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
+    for (const { war_id, nation_id, nation_name } of members) {
+      if (!war_id || warMap.has(String(war_id))) continue;
+      warMap.set(String(war_id), {
+        room,
+        ctx: {
+          ourNationId:     nation_id,
+          ourNationName:   nation_name,
+          enemyNationId:   room.enemy_nation_id,
+          enemyNationName: room.enemy_nation_name,
+        },
+      });
+    }
+  }
+  if (warMap.size === 0) return;
+
+  const allAttacks = await fetchAttacksBatch([...warMap.keys()]);
+  if (allAttacks.length === 0) return;
+
+  // Group by war_id so each room only processes its own attacks.
+  const byWar = new Map();
+  for (const attack of allAttacks) {
+    const key = String(attack.war_id);
+    if (!byWar.has(key)) byWar.set(key, []);
+    byWar.get(key).push(attack);
+  }
+
+  for (const [warId, warAttacks] of byWar) {
+    const entry = warMap.get(warId);
+    if (!entry) continue;
+    await sendWarAttacks(client, entry.room, warId, entry.ctx, warAttacks);
+  }
 }
 
-async function processRoomAttacks(client, room) {
+async function sendWarAttacks(client, room, war_id, ctx, attacks) {
   try {
     const channel = client.channels.cache.get(room.channel_id);
     if (!channel) return;
-    const members = query('SELECT DISTINCT war_id, nation_id, nation_name FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
-    for (const { war_id, nation_id, nation_name } of members) {
-      if (!war_id) continue;
-      const ctx = {
-        ourNationId:     nation_id,
-        ourNationName:   nation_name,
-        enemyNationId:   room.enemy_nation_id,
-        enemyNationName: room.enemy_nation_name,
-      };
-      const lastRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='war_attack_last' AND setting_key=?`, [room.guild_id, String(war_id)]);
-      const newAttacks = await fetchNewAttacks(war_id, lastRow?.setting_value||null);
-      if (newAttacks.length===0) continue;
-      newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
-      for (const attack of newAttacks) {
-        if (['FORTIFY'].includes(attack.type)) continue;
-        const embed = buildAttackReport(attack, ctx);
-        try {
-          await channel.send({ embeds: [embed] });
-        } catch (sendErr) {
-          // Do NOT mark this attack as reported — the send genuinely failed
-          // (often a transient Discord network blip). Stop here so this
-          // attack (and anything after it) gets retried in order on the
-          // next 1-minute cycle instead of being silently lost.
-          logger.error(`Failed to send attack report (attack ${attack.id}, war ${war_id}): ${sendErr.message}`);
-          break;
-        }
-        run(`INSERT INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'war_attack_last',?,?) ON CONFLICT(guild_id,alert_type,setting_key) DO UPDATE SET setting_value=excluded.setting_value`,
-          [room.guild_id, String(war_id), String(attack.id)]);
+
+    const lastRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='war_attack_last' AND setting_key=?`, [room.guild_id, String(war_id)]);
+    const lastAttackId = lastRow?.setting_value || null;
+    const newAttacks = lastAttackId ? attacks.filter(a => parseInt(a.id) > parseInt(lastAttackId)) : attacks;
+    if (newAttacks.length === 0) return;
+    newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
+
+    for (const attack of newAttacks) {
+      if (['FORTIFY'].includes(attack.type)) continue;
+      const embed = buildAttackReport(attack, ctx);
+      try {
+        await channel.send({ embeds: [embed] });
+      } catch (sendErr) {
+        // Do NOT mark this attack as reported — the send genuinely failed
+        // (often a transient Discord network blip). Stop here so this
+        // attack (and anything after it) gets retried in order on the
+        // next cycle instead of being silently lost.
+        logger.error(`Failed to send attack report (attack ${attack.id}, war ${war_id}): ${sendErr.message}`);
+        break;
       }
+      run(`INSERT INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'war_attack_last',?,?) ON CONFLICT(guild_id,alert_type,setting_key) DO UPDATE SET setting_value=excluded.setting_value`,
+        [room.guild_id, String(war_id), String(attack.id)]);
     }
-  } catch (err) { logger.error(`processRoomAttacks: ${err.message}`); }
+  } catch (err) { logger.error(`sendWarAttacks: ${err.message}`); }
 }
 
 async function sendOrRefreshWarCard(channel, room, warData, ourData, enemyData, director, isCounter, counterDetail) {

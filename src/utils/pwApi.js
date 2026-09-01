@@ -43,6 +43,19 @@ async function pwQuery(queryStr, variables = {}, _retryCount = 0) {
       logger.warn('P&W API errors: ' + JSON.stringify(res.data.errors, null, 2));
     }
 
+    // P&W's daily quota (2,000/day standard, 5,000/day VIP) is a DAILY cap,
+    // not per-minute. Hitting it doesn't always throw an HTTP error — it can
+    // come back as a normal 200 response with an unexpected body shape,
+    // which would otherwise silently look identical to "no data yet". Flag
+    // this loudly instead of letting it disappear.
+    const bodyText = JSON.stringify(res.data).toLowerCase();
+    if (bodyText.includes('limit') && (bodyText.includes('daily') || bodyText.includes('request'))) {
+      logger.error('P&W API possibly returned a rate-limit/quota message: ' + JSON.stringify(res.data));
+    }
+    if (res.data.data === undefined) {
+      logger.warn('P&W API response had no `data` field — raw body: ' + JSON.stringify(res.data).slice(0, 500));
+    }
+
     return res.data.data;
   } catch (err) {
     if (err.response?.status === 429) {

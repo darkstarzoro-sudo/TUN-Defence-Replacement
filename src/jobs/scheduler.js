@@ -28,8 +28,12 @@ async function startAllJobs(client) {
     await checkAllianceDefense(client);
   });
 
-  // War room attack reports every 1 minute
-  cron.schedule('* * * * *', async () => {
+  // War room attack reports every 8 seconds. Safe under a 15k/day VIP quota
+  // now that checkWarRoomAttacks does ONE batched API call per cycle
+  // regardless of how many war rooms are active (see warRoomManager.js).
+  // 8s ≈ 10,800 requests/day for this job alone, leaving headroom for the
+  // other scheduled jobs below plus manual commands and retries.
+  cron.schedule('*/8 * * * * *', async () => {
     await checkWarRoomAttacks(client);
   });
 
@@ -75,7 +79,7 @@ async function startAllJobs(client) {
     await generateDailyReport(client);
   });
 
-  logger.info('✅ Scheduler — defense 60s | attacks 1min | DNR 3min | beige 5min | military/vacation 15min | expiry 30min | backup 6h | daily 08:00 UTC');
+  logger.info('✅ Scheduler — defense 60s | attacks 8s | DNR 3min | beige 5min | military/vacation 15min | expiry 30min | backup 6h | daily 08:00 UTC');
 }
 
 module.exports = { startAllJobs };
