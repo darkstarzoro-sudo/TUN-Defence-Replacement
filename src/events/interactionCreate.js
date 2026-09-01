@@ -6,8 +6,8 @@
 const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const logger = require('../utils/logger');
 const { checkPermission } = require('../utils/permissions');
-const { run, queryOne, query } = require('../utils/database');
-const { buildWarButtons, fetchWarData, fetchNationData, sendOrRefreshWarCard } = require('../systems/military/warRoomManager');
+const { run, queryOne } = require('../utils/database');
+const { buildWarButtons, fetchWarData, fetchNationData, sendUnifiedWarCard } = require('../systems/military/warRoomManager');
 const { getAllianceMembers } = require('../utils/pwApi');
 const { buildNationToDiscordMap } = require('../utils/nationLink');
 
@@ -47,24 +47,16 @@ module.exports = {
 };
 
 // ── WAR CLAIM ────────────────────────────────────────────────
-async function handleWarClaim(interaction, warId, client) {
+async function handleWarClaim(interaction, roomId, client) {
   try {
     await interaction.deferReply({ flags: 64 });
-    const room = queryOne('SELECT * FROM war_rooms WHERE channel_id=? AND status=?', [interaction.channelId, 'active']);
+    const room = queryOne('SELECT * FROM war_rooms WHERE id=? AND status=?', [roomId, 'active']);
     if (!room) return interaction.editReply('❌ This is not an active war room.');
 
     run('UPDATE war_rooms SET director_discord_id=? WHERE id=?', [interaction.user.id, room.id]);
 
-    const members   = query('SELECT * FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
-    const ourMember = members[0];
-    const [warData, ourData, enemyData] = await Promise.all([
-      fetchWarData(warId, ourMember?.nation_id, room.enemy_nation_id),
-      ourMember ? fetchNationData(ourMember.nation_id) : Promise.resolve(null),
-      fetchNationData(room.enemy_nation_id),
-    ]);
-
     const updatedRoom = queryOne('SELECT * FROM war_rooms WHERE id=?', [room.id]);
-    await sendOrRefreshWarCard(interaction.channel, updatedRoom, warData, ourData, enemyData, interaction.user.username, false, null);
+    await sendUnifiedWarCard(interaction.channel, updatedRoom);
 
     await interaction.editReply('✅ You are now the **Director** of this war room.');
     await interaction.channel.send({ content: `🎖️ <@${interaction.user.id}> has claimed command of this war room.` });
@@ -74,28 +66,14 @@ async function handleWarClaim(interaction, warId, client) {
   }
 }
 
-// ── WAR STATUS — deletes old card, reposts at bottom, pins it ─
-async function handleWarStatus(interaction, warId, client) {
+// ── WAR STATUS / REFRESH — rebuilds the unified card for EVERY member ─
+async function handleWarStatus(interaction, roomId, client) {
   try {
     await interaction.deferReply({ flags: 64 });
-    const room = queryOne('SELECT * FROM war_rooms WHERE channel_id=?', [interaction.channelId]);
+    const room = queryOne('SELECT * FROM war_rooms WHERE id=?', [roomId]);
     if (!room) return interaction.editReply('❌ This is not a war room.');
 
-    const members   = query('SELECT * FROM war_room_members WHERE war_room_id=?', [room.id]).rows;
-    const ourMember = members[0];
-
-    const [warData, ourData, enemyData] = await Promise.all([
-      fetchWarData(warId, ourMember?.nation_id, room.enemy_nation_id),
-      ourMember ? fetchNationData(ourMember.nation_id) : Promise.resolve(null),
-      fetchNationData(room.enemy_nation_id),
-    ]);
-
-    const director = room.director_discord_id
-      ? (await client.users.fetch(room.director_discord_id).catch(() => null))?.username
-      : null;
-
-    // Delete old, send fresh at bottom, pin it
-    await sendOrRefreshWarCard(interaction.channel, room, warData, ourData, enemyData, director, false, null);
+    await sendUnifiedWarCard(interaction.channel, room);
     await interaction.editReply('✅ War card refreshed — check the bottom of the channel (it\'s pinned).');
   } catch (err) {
     logger.error(`War status error: ${err.message}`);
