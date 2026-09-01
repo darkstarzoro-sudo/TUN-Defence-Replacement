@@ -7,7 +7,14 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('./logger');
 
-const DB_PATH = path.join(__dirname, '../../data/bot.db');
+// On Railway, RAILWAY_VOLUME_MOUNT_PATH tells us exactly where the attached
+// volume is mounted. Using it directly (instead of a hardcoded '../../data')
+// avoids a mismatch if the volume's configured mount path differs from what
+// the code assumes — which would otherwise silently write the database to
+// the container's non-persistent local disk instead of the actual volume.
+const DB_PATH = process.env.RAILWAY_VOLUME_MOUNT_PATH
+  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'bot.db')
+  : path.join(__dirname, '../../data/bot.db');
 
 let db;
 let sqlJs;
