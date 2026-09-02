@@ -70,11 +70,25 @@ function saveDatabase() {
   }
 }
 
+// sql.js throws on a bind parameter that's JavaScript `undefined` (as opposed
+// to `null`, which is fine) — often with an error object that doesn't even
+// have a proper `.message`, which is why some past errors logged as blank.
+// This converts any stray `undefined` (e.g. from an unlinked Discord user,
+// a missing lookup result, etc.) to `null` before it ever reaches sql.js.
+function sanitizeParams(params) {
+  return params.map(p => p === undefined ? null : p);
+}
+
+function describeError(error) {
+  if (error && error.message) return error.message;
+  try { return JSON.stringify(error); } catch { return String(error); }
+}
+
 // Run a SELECT query — returns { rows: [...] }
 function query(sql, params = []) {
   try {
     const stmt = db.prepare(sql);
-    stmt.bind(params);
+    stmt.bind(sanitizeParams(params));
     const rows = [];
     while (stmt.step()) {
       rows.push(stmt.getAsObject());
@@ -82,7 +96,7 @@ function query(sql, params = []) {
     stmt.free();
     return { rows };
   } catch (error) {
-    logger.error(`DB query error: ${error.message}`);
+    logger.error(`DB query error: ${describeError(error)}`);
     logger.error(`SQL: ${sql}`);
     throw error;
   }
@@ -91,10 +105,10 @@ function query(sql, params = []) {
 // Run INSERT / UPDATE / DELETE
 function run(sql, params = []) {
   try {
-    db.run(sql, params);
+    db.run(sql, sanitizeParams(params));
     saveDatabase(); // Save after every write
   } catch (error) {
-    logger.error(`DB run error: ${error.message}`);
+    logger.error(`DB run error: ${describeError(error)}`);
     logger.error(`SQL: ${sql}`);
     throw error;
   }
