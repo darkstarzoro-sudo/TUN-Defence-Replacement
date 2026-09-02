@@ -78,6 +78,7 @@ async function buildUnifiedWarCards(room) {
       `👮 ${(ourData?.soldiers||0).toLocaleString()} | 🚗 ${(ourData?.tanks||0).toLocaleString()} | ✈️ ${ourData?.aircraft||0} | 🚢 ${ourData?.ships||0}`,
       `🚀 ${ourData?.missiles||0} | ☢️ ${ourData?.nukes||0} | 🕵️ ${ourData?.spies||0}`,
       `❤️ Resistance: **${warData?.ourResistance??'?'}/100** (enemy: **${warData?.enemyResistance??'?'}/100**) | ⏳ Turns Left: **${warData?.turnsleft??'?'}**`,
+      `🎯 MAP: **${warData?.ourMAP??'?'}/12** (enemy: **${warData?.enemyMAP??'?'}/12**)`,
       `[View This War](https://politicsandwar.com/nation/war/timeline/war=${member.war_id})`,
     ].join('\n');
     return { name: name.slice(0,256), value: value.slice(0,1024), inline: false };
@@ -172,8 +173,39 @@ async function sendUnifiedWarCard(channel, room) {
 }
 
 async function fetchWarData(warId, ourNationId, enemyNationId) {
+  // att_points/def_points are our best-evidence guess for the MAP (Military
+  // Action Points) field names — inferred from the confirmed att_resistance/
+  // def_resistance naming pattern and the old v2 API's equivalent field
+  // names, but NOT directly confirmed against the live v3 schema. A wrong
+  // field name fails the ENTIRE GraphQL query (not just that one field, as
+  // we've hit twice before in this same file), so this tries the enhanced
+  // query first and falls back to the known-safe query if it errors —
+  // MAP will just show as unavailable rather than breaking the whole card.
   try {
-    // NOTE: att_map/def_map do NOT exist in P&W API wars query
+    const data = await pwQuery(`
+      query W($id:[Int]){wars(id:$id,first:1){data{
+        id turnsleft att_resistance def_resistance att_points def_points attid defid
+      }}}
+    `, { id:[parseInt(warId)] });
+    const war = data?.wars?.data?.[0];
+    if (war) {
+      const weAtt = String(war.attid)===String(ourNationId);
+      return {
+        ...war,
+        isOurAttack:     weAtt,
+        ourNationId,
+        ourResistance:   weAtt ? war.att_resistance : war.def_resistance,
+        ourMAP:          weAtt ? war.att_points : war.def_points,
+        enemyResistance: weAtt ? war.def_resistance : war.att_resistance,
+        enemyMAP:        weAtt ? war.def_points : war.att_points,
+      };
+    }
+  } catch (err) {
+    logger.warn(`fetchWarData: att_points/def_points query failed (${err.message}) — falling back to MAP-less query. This likely means those field names are wrong; MAP will show as unavailable until corrected.`);
+  }
+
+  // Fallback — known-safe query without the unverified MAP fields.
+  try {
     const data = await pwQuery(`
       query W($id:[Int]){wars(id:$id,first:1){data{
         id turnsleft att_resistance def_resistance attid defid
@@ -228,6 +260,7 @@ async function fetchAttacksBatch(warIds) {
         infra_destroyed infra_destroyed_value
         att_soldiers_lost def_soldiers_lost att_tanks_lost def_tanks_lost
         att_aircraft_lost def_aircraft_lost att_ships_lost def_ships_lost
+        moneystolen loot_info
         date
       }}}
     `, { warId: ids });
@@ -280,6 +313,69 @@ function getAttackTypeInfo(rawType) {
   return ATTACK_TYPE_INFO[type] || { emoji:'⚔️', label:(rawType||'Unknown').replace(/_/g,' '), verb:'attacked' };
 }
 
+// P&W's `loot_info` field on WarAttack is a String whose exact serialization
+// format isn't confirmed from documentation, so this parses defensively:
+// tries JSON first, then a "{KEY=1,234, KEY2=56}" style map-toString format.
+// Either way, if parsing fails entirely we still have `moneystolen` (a plain
+// float) as a reliable fallback for at least the money figure.
+const LOOT_RESOURCE_INFO = {
+  MONEY:     { emoji:'💵', label:'Money',     isDollar:true },
+  FOOD:      { emoji:'🌾', label:'Food' },
+  COAL:      { emoji:'⚫', label:'Coal' },
+  OIL:       { emoji:'🛢️', label:'Oil' },
+  URANIUM:   { emoji:'☢️', label:'Uranium' },
+  IRON:      { emoji:'⛏️', label:'Iron' },
+  BAUXITE:   { emoji:'🪨', label:'Bauxite' },
+  GASOLINE:  { emoji:'⛽', label:'Gasoline' },
+  MUNITIONS: { emoji:'💣', label:'Munitions' },
+  STEEL:     { emoji:'🔩', label:'Steel' },
+  ALUMINUM:  { emoji:'🔧', label:'Aluminum' },
+};
+
+function normalizeLootKeys(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj||{})) {
+    const key = k.toUpperCase();
+    if (LOOT_RESOURCE_INFO[key]) out[key] = Number(v) || 0;
+  }
+  return out;
+}
+
+function parseLootInfo(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return normalizeLootKeys(parsed);
+  } catch {}
+  const matches = [...raw.matchAll(/([A-Za-z_]+)\s*=\s*(-?[\d,]+(?:\.\d+)?)/g)];
+  if (matches.length > 0) {
+    const obj = {};
+    for (const [, key, val] of matches) obj[key.toUpperCase()] = parseFloat(val.replace(/,/g,''));
+    return normalizeLootKeys(obj);
+  }
+  return null;
+}
+
+function formatLootLine(lootObj) {
+  if (!lootObj) return null;
+  const parts = [];
+  for (const [key, info] of Object.entries(LOOT_RESOURCE_INFO)) {
+    const val = lootObj[key];
+    if (!val) continue;
+    const display = info.isDollar ? `$${Math.round(val).toLocaleString()}` : val.toLocaleString();
+    parts.push(`${info.emoji} ${info.label}: **${display}**`);
+  }
+  return parts.length > 0 ? parts.join(' | ') : null;
+}
+
+function getLootLineForAttack(attack) {
+  const parsed = parseLootInfo(attack.loot_info);
+  const line = formatLootLine(parsed);
+  if (line) return line;
+  if ((attack.moneystolen||0) > 0) return `💵 Money: **$${Number(attack.moneystolen).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}**`;
+  return null;
+}
+
 // NOTE: WarAttack does NOT expose att_nation_name/def_nation_name in the P&W API
 // (confirmed via live GraphQL validation error). Names are resolved from the
 // war room's own known nations (ctx) instead of the attack payload.
@@ -288,13 +384,20 @@ function buildAttackReport(attack, ctx={}) {
   const typeInfo     = getAttackTypeInfo(attack.type);
   const attName      = resolveAttackName(attack.attid, ctx);
   const defName      = resolveAttackName(attack.defid, ctx);
+  const normType     = normalizeAttackType(attack.type);
+  const isPeace      = normType === 'PEACE';
 
-  const resultText = successTag==='UTTER_FAILURE' ? 'an **utter failure**'
+  // A peace offer isn't a combat roll — "pyrrhic victory" / "immense
+  // triumph" style commentary doesn't make sense attached to it, so peace
+  // gets its own plain description with no success-tier language or color.
+  const resultText = isPeace ? null
+    : successTag==='UTTER_FAILURE' ? 'an **utter failure**'
     : successTag==='PYRRHIC_VICTORY' ? 'a **pyrrhic victory** — won at great cost'
     : successTag==='MODERATE_SUCCESS' ? 'a **moderate success**'
     : 'an **immense triumph**';
 
-  const color = successTag==='UTTER_FAILURE' ? 0xe74c3c
+  const color = isPeace ? 0x95a5a6
+    : successTag==='UTTER_FAILURE' ? 0xe74c3c
     : successTag==='PYRRHIC_VICTORY' ? 0xf39c12
     : successTag==='MODERATE_SUCCESS' ? 0x3498db
     : 0x2ecc71;
@@ -303,12 +406,33 @@ function buildAttackReport(attack, ctx={}) {
     .setColor(color)
     .setTitle(`${typeInfo.emoji} ${typeInfo.label}`)
     .setDescription(
-      `**[${attName}](https://politicsandwar.com/nation/id=${attack.attid})** ${typeInfo.verb} ` +
-      `**[${defName}](https://politicsandwar.com/nation/id=${attack.defid})** — it was ${resultText}!`
+      isPeace
+        ? `**${attName}** ${typeInfo.verb} **${defName}**.`
+        : `**[${attName}](https://politicsandwar.com/nation/id=${attack.attid})** ${typeInfo.verb} ` +
+          `**[${defName}](https://politicsandwar.com/nation/id=${attack.defid})** — it was ${resultText}!`
     );
 
   if ((attack.infra_destroyed||0)>0) {
     embed.addFields({ name:'🏗️ Infrastructure Destroyed', value:`${Number(attack.infra_destroyed).toFixed(2)} infra ($${Number(attack.infra_destroyed_value||0).toLocaleString()})`, inline:false });
+  }
+
+  // Ground attacks (and any other type) can loot a straight dollar amount.
+  if (normType === 'GROUND') {
+    const lootLine = getLootLineForAttack(attack);
+    if (lootLine) embed.addFields({ name:'💰 Looted', value:lootLine, inline:false });
+  }
+
+  // VICTORY = resources looted from the defeated NATION when their
+  // resistance is finished off. ALLIANCELOOT = resources looted from that
+  // nation's ALLIANCE. Both show a full resource breakdown when available,
+  // and explicitly say so when nothing was looted rather than omitting it.
+  if (normType === 'VICTORY') {
+    const lootLine = getLootLineForAttack(attack);
+    embed.addFields({ name:'🏆 Looted from Nation', value: lootLine || 'Nothing was looted.', inline:false });
+  }
+  if (normType === 'ALLIANCELOOT') {
+    const lootLine = getLootLineForAttack(attack);
+    embed.addFields({ name:'💰 Looted from Alliance', value: lootLine || 'Nothing was looted.', inline:false });
   }
 
   const attLosses=[], defLosses=[];
