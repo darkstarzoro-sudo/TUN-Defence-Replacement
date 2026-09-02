@@ -5,7 +5,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 const { run, queryOne, query } = require('../../utils/database');
 const { pwQuery, MEMBER_POSITIONS } = require('../../utils/pwApi');
-const { getOrCreateWarRoom, isInactiveNation } = require('../../systems/military/warRoomManager');
+const { getOrCreateWarRoom, isInactiveNation, sendUnifiedWarCard } = require('../../systems/military/warRoomManager');
 const { buildNationToDiscordMap } = require('../../utils/nationLink');
 const { isLegitimateCounter } = require('../../utils/counterDetector');
 
@@ -23,6 +23,10 @@ module.exports = {
       sub.setName('sync')
         .setDescription('Force-create war rooms for ALL currently active wars (including old ones)')
         .addBooleanOption(opt => opt.setName('offensive').setDescription('Also create rooms for offensive wars (default: true)'))
+    )
+    .addSubcommand(sub =>
+      sub.setName('card')
+        .setDescription('Regenerate this war room\'s card — use if it was accidentally deleted')
     ),
 
   requiredRole: 'military',
@@ -71,6 +75,28 @@ module.exports = {
     }
 
     // ── SYNC ──────────────────────────────────────────────────
+    // ── CARD — regenerate a lost/deleted war card ────────────
+    if (sub === 'card') {
+      await interaction.deferReply({ flags: 64 });
+
+      const room = queryOne(`SELECT * FROM war_rooms WHERE guild_id=? AND channel_id=? AND status='active'`, [interaction.guildId, interaction.channelId]);
+      if (!room) {
+        return interaction.editReply('❌ This channel isn\'t an active war room (or the room was closed). Run this command inside the war room channel itself.');
+      }
+
+      const memberCount = query('SELECT COUNT(*) as c FROM war_room_members WHERE war_room_id=?', [room.id]).rows[0]?.c || 0;
+      if (memberCount === 0) {
+        return interaction.editReply('❌ This war room has no tracked members to build a card from — nothing to regenerate.');
+      }
+
+      const newCard = await sendUnifiedWarCard(interaction.channel, room);
+      if (!newCard) {
+        return interaction.editReply('❌ Something went wrong building the card. Check the bot logs for details.');
+      }
+
+      return interaction.editReply(`✅ War card regenerated for **${memberCount} member${memberCount===1?'':'s'}** — check the bottom of the channel (it's pinned).`);
+    }
+
     if (sub === 'sync') {
       await interaction.deferReply({ flags: 64 });
 
