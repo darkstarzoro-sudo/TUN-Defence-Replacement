@@ -147,7 +147,7 @@ module.exports = {
             if (dnrEntry) { skipped++; continue; }
           }
 
-          const ourDiscordId = discordMap.get(ourNation.id) || discordMap.get(String(ourNation.id));
+          const ourDiscordId = discordMap.get(ourNation.id) || discordMap.get(String(ourNation.id)) || null;
 
           // Mark as seen to prevent double-alerts
           run(`INSERT OR IGNORE INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'war_seen',?,datetime('now'))`,
