@@ -539,9 +539,25 @@ async function sendWarAttacks(client, room, war_id, ctx, attacks) {
 async function getOrCreateWarRoom(client, guild, guildId, enemyNation, ourDiscordId, ourMemberName, war, isCounter, counterDetail) {
   try {
     const existing = queryOne('SELECT * FROM war_rooms WHERE guild_id=? AND enemy_nation_id=? AND status=?', [guildId, enemyNation.id, 'active']);
-    if (existing) { await addMemberToWarRoom(client, guild, guildId, existing, ourDiscordId, ourMemberName, war, isCounter, counterDetail); return existing; }
+    if (existing) {
+      // The DB row can outlive the actual Discord channel if someone
+      // deletes the channel manually instead of through the bot — the row
+      // still says 'active', so this used to silently route to
+      // addMemberToWarRoom, which just no-ops when the channel is missing
+      // (no error, no new room, nothing visibly wrong). Detect that here
+      // and treat the stale room as gone instead.
+      const channelStillExists = guild.channels.cache.get(existing.channel_id);
+      if (!channelStillExists) {
+        logger.warn(`War room for ${enemyNation.nation_name} pointed at a deleted channel (${existing.channel_id}) — marking stale and creating a fresh room.`);
+        run('UPDATE war_rooms SET status=? WHERE id=?', ['closed', existing.id]);
+        run('DELETE FROM war_room_members WHERE war_room_id=?', [existing.id]);
+      } else {
+        await addMemberToWarRoom(client, guild, guildId, existing, ourDiscordId, ourMemberName, war, isCounter, counterDetail);
+        return existing;
+      }
+    }
     return await createWarRoom(client, guild, guildId, enemyNation, ourDiscordId, ourMemberName, war, isCounter, counterDetail);
-  } catch (err) { logger.error(`War room error: ${err.message}`); }
+  } catch (err) { logger.error(`War room error: ${err?.message || JSON.stringify(err)}`); }
 }
 
 async function createWarRoom(client, guild, guildId, enemyNation, ourDiscordId, ourMemberName, war, isCounter, counterDetail) {
