@@ -461,6 +461,15 @@ function buildAttackReport(attack, ctx={}) {
   const gifUrl = getGif(attack.type, successTag);
   if (gifUrl) embed.setImage(gifUrl);
 
+  // TEMP DIAGNOSTIC: missile GIFs were reported as not showing despite the
+  // URL and code logic checking out fine in review — logging what actually
+  // happens here (rather than guessing again) so the real cause is visible
+  // on the next missile attack. Uses logger.info so it isn't filtered out
+  // on Railway's production log level. Remove once confirmed/fixed.
+  if (normalizeAttackType(attack.type) === 'MISSILE' || normalizeAttackType(attack.type) === 'MISSILEFAIL') {
+    logger.info(`MISSILE GIF DEBUG: type=${attack.type} normType=${normalizeAttackType(attack.type)} successTag=${successTag} resolvedGifUrl=${gifUrl || 'NULL'}`);
+  }
+
   if (attack.date) {
     const d = new Date(attack.date);
     if (!isNaN(d.getTime())) embed.setTimestamp(d);

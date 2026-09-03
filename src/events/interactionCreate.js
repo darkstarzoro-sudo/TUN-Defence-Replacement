@@ -131,7 +131,18 @@ async function handleWarSpies(interaction, warId, client) {
     if (!enemyData) return interaction.editReply('❌ Could not fetch enemy data.');
 
     const discordMap = buildNationToDiscordMap(interaction.guildId);
-    const min = (enemyData.score||0) * 0.5, max = (enemyData.score||0) * 2.0;
+    // Official P&W spy range is -60% to +150% of score (confirmed via
+    // politicsandwar.com/pwpedia), not the war-range formula this used to
+    // borrow. Since 0.4 and 2.5 are reciprocals, it doesn't matter whether
+    // the window is computed from the enemy's score or each member's own —
+    // the eligibility check comes out identical either way.
+    const min = (enemyData.score||0) * 0.4, max = (enemyData.score||0) * 2.5;
+    const enemySpies = enemyData.spies||0;
+
+    // Official espionage success formula (Normal Precautions safety level):
+    // Odds = 50 + (Your Spies * 100 / (Enemy Spies * 3 + 1))
+    const estimateOdds = (mySpies) => Math.min(100, Math.round(50 + ((mySpies||0) * 100) / ((enemySpies * 3) + 1)));
+
     const eligible = ourMembers
       .filter(m => m.score >= min && m.score <= max && (m.vacation_mode_turns||0) === 0 && (m.spies||0) > 0)
       .sort((a, b) => (b.spies||0) - (a.spies||0));
@@ -140,10 +151,11 @@ async function handleWarSpies(interaction, warId, client) {
 
     const lines = eligible.slice(0, 15).map(m => {
       const dId = discordMap.get(m.id) || discordMap.get(String(m.id));
-      return `${dId ? `<@${dId}>` : `**${m.nation_name}**`} — [${m.nation_name}](https://politicsandwar.com/nation/id=${m.id})\n└ 🕵️ Spies: **${m.spies||0}** | Score: ${Math.round(m.score).toLocaleString()}`;
+      const odds = estimateOdds(m.spies);
+      return `${dId ? `<@${dId}>` : `**${m.nation_name}**`} — [${m.nation_name}](https://politicsandwar.com/nation/id=${m.id})\n└ 🕵️ Spies: **${m.spies||0}** | Score: ${Math.round(m.score).toLocaleString()} | ~**${odds}%** success (Normal Precautions)`;
     });
 
-    await interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🕵️ Spy Options vs ${enemyData.nation_name}`).setColor(0x8e44ad).setDescription(lines.join('\n\n')).addFields({ name: '🎯 Enemy Spies', value: `${enemyData.spies||0}`, inline: true }, { name: '📏 Spy Range', value: `${Math.round(min).toLocaleString()} – ${Math.round(max).toLocaleString()}`, inline: true }).setFooter({ text: `${eligible.length} in spy range` }).setTimestamp()] });
+    await interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🕵️ Spy Options vs ${enemyData.nation_name}`).setColor(0x8e44ad).setDescription(lines.join('\n\n')).addFields({ name: '🎯 Enemy Spies', value: `${enemySpies}`, inline: true }, { name: '📏 Spy Range', value: `${Math.round(min).toLocaleString()} – ${Math.round(max).toLocaleString()}`, inline: true }).setFooter({ text: `${eligible.length} in spy range | odds shown are an estimate at Normal Precautions safety level` }).setTimestamp()] });
   } catch (err) {
     logger.error(`War spies error: ${err.message}`);
     await interaction.editReply('❌ Something went wrong.').catch(() => {});

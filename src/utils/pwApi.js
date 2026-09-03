@@ -334,6 +334,7 @@ async function getAllianceMembers(allianceId) {
           ships
           missiles
           nukes
+          spies
           beige_turns
           vacation_mode_turns
           offensive_wars_count
