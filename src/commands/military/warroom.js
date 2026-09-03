@@ -4,10 +4,7 @@
 
 const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 const { run, queryOne, query } = require('../../utils/database');
-const { pwQuery, MEMBER_POSITIONS } = require('../../utils/pwApi');
-const { getOrCreateWarRoom, isInactiveNation, sendUnifiedWarCard } = require('../../systems/military/warRoomManager');
-const { buildNationToDiscordMap } = require('../../utils/nationLink');
-const { isLegitimateCounter } = require('../../utils/counterDetector');
+const { isInactiveNation, sendUnifiedWarCard, runWarRoomSync } = require('../../systems/military/warRoomManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -27,6 +24,11 @@ module.exports = {
     .addSubcommand(sub =>
       sub.setName('card')
         .setDescription('Regenerate this war room\'s card — use if it was accidentally deleted')
+    )
+    .addSubcommand(sub =>
+      sub.setName('autosync')
+        .setDescription('Turn the automatic background sync on or off')
+        .addBooleanOption(opt => opt.setName('enabled').setDescription('On or off').setRequired(true))
     ),
 
   requiredRole: 'military',
@@ -100,122 +102,46 @@ module.exports = {
     if (sub === 'sync') {
       await interaction.deferReply({ flags: 64 });
 
-      const catRow   = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='warroom' AND setting_key='category_id'`, [interaction.guildId]);
+      const catRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='warroom' AND setting_key='category_id'`, [interaction.guildId]);
       if (!catRow) return interaction.editReply('❌ No war room category configured. Run `/warroom setup` first.');
 
       const guildRow = queryOne('SELECT alliance_id FROM guilds WHERE guild_id=?', [interaction.guildId]);
       if (!guildRow?.alliance_id) return interaction.editReply('❌ No alliance configured.');
 
-      const includeOff    = interaction.options.getBoolean('offensive') ?? true;
-      const allianceId    = guildRow.alliance_id;
-      const allianceIdStr = String(allianceId);
+      const includeOff = interaction.options.getBoolean('offensive') ?? true;
+      await interaction.editReply('⏳ Syncing wars, members, and permissions...');
 
-      await interaction.editReply('⏳ Fetching active wars from P&W...');
-
-      let allWars = [];
-      try {
-        // No att_map/def_map — they don't exist in P&W API
-        const data = await pwQuery(`
-          query GetAllianceWars($allianceId:[Int]) {
-            wars(alliance_id:$allianceId, active:true, first:100) {
-              data {
-                id att_alliance_id def_alliance_id attid defid
-                att_resistance def_resistance turnsleft
-                attacker { id nation_name score alliance_position soldiers tanks aircraft ships missiles nukes spies last_active alliance { id name } }
-                defender { id nation_name score alliance_position soldiers tanks aircraft ships missiles nukes spies last_active alliance { id name } }
-              }
-            }
-          }
-        `, { allianceId: [parseInt(allianceId)] });
-        allWars = data?.wars?.data || [];
-      } catch (err) {
-        return interaction.editReply(`❌ Failed to fetch wars: ${err.message}`);
-      }
-
-      const defWars       = allWars.filter(w => String(w.def_alliance_id) === allianceIdStr);
-      const offWars       = includeOff ? allWars.filter(w => String(w.att_alliance_id) === allianceIdStr) : [];
-      const warsToProcess = [...defWars, ...offWars];
-
-      if (warsToProcess.length === 0) return interaction.editReply('✅ No active wars found.');
-
-      await interaction.editReply(`⏳ Found **${defWars.length}** defensive + **${offWars.length}** offensive wars. Creating rooms...`);
-
-      const discordMap = buildNationToDiscordMap(interaction.guildId);
-      const guild      = interaction.guild;
-      let created = 0, existing = 0, skipped = 0, inactive = 0, addedToExisting = 0;
-      const errors = [];
-
-      for (const war of warsToProcess) {
-        try {
-          const isOff      = String(war.att_alliance_id) === allianceIdStr;
-          const ourNation  = isOff ? war.attacker : war.defender;
-          const enemyNation = isOff ? war.defender : war.attacker;
-
-          if (!ourNation || !enemyNation) { skipped++; continue; }
-          if (!MEMBER_POSITIONS.includes((ourNation.alliance_position || '').toUpperCase())) { skipped++; continue; }
-
-          const existingRoom = queryOne('SELECT id FROM war_rooms WHERE guild_id=? AND enemy_nation_id=? AND status=?', [interaction.guildId, enemyNation.id, 'active']);
-          // Only skip if THIS SPECIFIC war is already tracked in that room —
-          // not just because a room exists for the enemy. A room existing
-          // only means at least one of our members is already fighting this
-          // enemy; a second/third member with a DIFFERENT war_id against the
-          // same enemy still needs to be added via getOrCreateWarRoom below
-          // (which correctly routes to addMemberToWarRoom for an existing room).
-          const alreadyTrackedThisWar = existingRoom && queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND war_id=?', [existingRoom.id, war.id]);
-          if (alreadyTrackedThisWar) { existing++; continue; }
-
-          if (isInactiveNation(enemyNation.last_active)) { inactive++; continue; }
-
-          const counterResult = await isLegitimateCounter(interaction.guildId, allianceId, enemyNation.id, enemyNation.alliance?.id);
-
-          if (isOff && !counterResult.isCounter) {
-            const dnrEntry = queryOne('SELECT id FROM dnr_list WHERE guild_id=? AND alliance_id=?', [interaction.guildId, parseInt(enemyNation.alliance?.id || 0)]);
-            if (dnrEntry) { skipped++; continue; }
-          }
-
-          const ourDiscordId = discordMap.get(ourNation.id) || discordMap.get(String(ourNation.id)) || null;
-
-          // Mark as seen to prevent double-alerts
-          run(`INSERT OR IGNORE INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'war_seen',?,datetime('now'))`,
-            [interaction.guildId, `war_${interaction.guildId}_${war.id}_${isOff ? 'off' : 'def'}`]);
-
-          const enrichedWar = {
-            id:              war.id,
-            isOurAttack:     isOff,
-            ourNationId:     ourNation.id,
-            turnsleft:       war.turnsleft,
-            ourResistance:   isOff ? war.att_resistance : war.def_resistance,
-            ourMAP:          null,
-            enemyResistance: isOff ? war.def_resistance : war.att_resistance,
-            enemyMAP:        null,
-          };
-
-          const result = await getOrCreateWarRoom(interaction.client, guild, interaction.guildId, enemyNation, ourDiscordId, ourNation.nation_name, enrichedWar, counterResult.isCounter, counterResult.detail);
-          if (result && existingRoom) addedToExisting++;
-          else if (result) created++;
-          else skipped++;
-
-          await new Promise(r => setTimeout(r, 1500));
-        } catch (err) {
-          errors.push(`War ${war.id}: ${err.message}`);
-          skipped++;
-        }
-      }
+      const summary = await runWarRoomSync(interaction.client, interaction.guild, interaction.guildId, guildRow.alliance_id, { includeOffensive: includeOff });
 
       const embed = new EmbedBuilder()
         .setTitle('✅ War Room Sync Complete')
-        .setColor((created + addedToExisting) > 0 ? 0x2ecc71 : 0x95a5a6)
+        .setColor((summary.created + summary.addedToExisting + summary.relinked) > 0 ? 0x2ecc71 : 0x95a5a6)
         .addFields(
-          { name: '🆕 New Rooms',        value: `${created}`,  inline: true },
-          { name: '➕ Added as Member',  value: `${addedToExisting}`, inline: true },
-          { name: '✅ Already Tracked',  value: `${existing}`, inline: true },
-          { name: '💤 Skipped (inactive 5d+)', value: `${inactive}`, inline: true },
-          { name: '⏭️ Skipped (other)',   value: `${skipped}`,  inline: true },
-          { name: '📊 Wars Scanned',     value: `${defWars.length} def + ${offWars.length} off = **${warsToProcess.length}**`, inline: false },
+          { name: '🆕 New Rooms',        value: `${summary.created}`,  inline: true },
+          { name: '➕ Added as Member',  value: `${summary.addedToExisting}`, inline: true },
+          { name: '🔗 Retroactively Linked', value: `${summary.relinked}`, inline: true },
+          { name: '✅ Already Tracked',  value: `${summary.existing}`, inline: true },
+          { name: '💤 Skipped (inactive 5d+)', value: `${summary.inactive}`, inline: true },
+          { name: '⏭️ Skipped (other)',   value: `${summary.skipped}`,  inline: true },
+          { name: '🔧 Rooms w/ Permission Fixes', value: `${summary.permissionsFixed}`, inline: true },
+          { name: '📊 Wars Scanned',     value: `${summary.defWarsCount} def + ${summary.offWarsCount} off = **${summary.defWarsCount + summary.offWarsCount}**`, inline: false },
         ).setTimestamp();
-      if (errors.length > 0) embed.addFields({ name: '⚠️ Errors', value: errors.slice(0, 5).join('\n').slice(0, 1020) });
+      if (summary.errors.length > 0) embed.addFields({ name: '⚠️ Errors', value: summary.errors.slice(0, 5).join('\n').slice(0, 1020) });
 
       return interaction.editReply({ content: '', embeds: [embed] });
+    }
+
+    // ── AUTOSYNC — toggle the scheduled background sync ──────
+    if (sub === 'autosync') {
+      const enabled = interaction.options.getBoolean('enabled');
+      run(`INSERT INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'warroom','autosync',?) ON CONFLICT(guild_id,alert_type,setting_key) DO UPDATE SET setting_value=excluded.setting_value`,
+        [interaction.guildId, enabled ? 'true' : 'false']);
+      return interaction.reply({
+        content: enabled
+          ? '✅ Auto-sync is now **ON** — war rooms, members, and permissions will be synced automatically in the background.'
+          : '✅ Auto-sync is now **OFF** — you\'ll need to run `/warroom sync` manually.',
+        flags: 64,
+      });
     }
   },
 };

@@ -11,7 +11,8 @@ const { checkAllianceDefense } = require('../systems/defense/warMonitor');
 const { checkVacationChanges, checkWarExpiry } = require('../systems/intelligence/vacationTracker');
 const { checkDnrViolations } = require('../systems/intelligence/dnrMonitor');
 const { runAutoBackup } = require('./backupJob');
-const { checkWarRoomAttacks } = require('../systems/military/warRoomManager');
+const { checkWarRoomAttacks, runWarRoomSync } = require('../systems/military/warRoomManager');
+const { query, queryOne } = require('../utils/database');
 
 async function startAllJobs(client) {
   logger.info('Starting background job scheduler...');
@@ -79,7 +80,52 @@ async function startAllJobs(client) {
     await generateDailyReport(client);
   });
 
-  logger.info('✅ Scheduler — defense 60s | attacks 8s | DNR 3min | beige 5min | military/vacation 15min | expiry 30min | backup 6h | daily 08:00 UTC');
+  // Auto-sync every 15 minutes: creates rooms for wars that slipped through,
+  // adds additional members fighting the same enemy, retroactively links
+  // members who weren't linked to Discord at attack time, and reconciles
+  // every active room's permissions against current role config. Runs for
+  // every guild that has BOTH a war room category configured AND hasn't
+  // explicitly turned it off via `/warroom autosync false` (default: ON).
+  let autoSyncRunning = false;
+  cron.schedule('*/15 * * * *', async () => {
+    if (autoSyncRunning) { logger.debug('Auto-sync still running from last cycle — skipping this one.'); return; }
+    autoSyncRunning = true;
+    try {
+      await runWarRoomAutoSync(client);
+    } finally {
+      autoSyncRunning = false;
+    }
+  });
+
+  logger.info('✅ Scheduler — defense 60s | attacks 8s | DNR 3min | beige 5min | military/vacation 15min | expiry 30min | warroom autosync 15min | backup 6h | daily 08:00 UTC');
+}
+
+async function runWarRoomAutoSync(client) {
+  const guildRows = query('SELECT guild_id, alliance_id FROM guilds WHERE alliance_id IS NOT NULL', []).rows;
+  for (const g of guildRows) {
+    try {
+      const catRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='warroom' AND setting_key='category_id'`, [g.guild_id]);
+      if (!catRow) continue; // war rooms not set up for this guild yet
+
+      const autosyncRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='warroom' AND setting_key='autosync'`, [g.guild_id]);
+      const enabled = autosyncRow ? autosyncRow.setting_value === 'true' : true; // default ON unless explicitly turned off
+      if (!enabled) continue;
+
+      const guild = client.guilds.cache.get(g.guild_id);
+      if (!guild) continue;
+
+      const summary = await runWarRoomSync(client, guild, g.guild_id, g.alliance_id, { includeOffensive: true });
+      const somethingHappened = summary.created + summary.addedToExisting + summary.relinked + summary.permissionsFixed > 0;
+      if (somethingHappened) {
+        logger.info(`Auto-sync (guild ${g.guild_id}): +${summary.created} new rooms, +${summary.addedToExisting} added as member, ${summary.relinked} retroactively linked, ${summary.permissionsFixed} room(s) had permission fixes`);
+      }
+      if (summary.errors.length > 0) {
+        logger.warn(`Auto-sync (guild ${g.guild_id}) had ${summary.errors.length} error(s): ${summary.errors.slice(0,3).join(' | ')}`);
+      }
+    } catch (err) {
+      logger.error(`Auto-sync error for guild ${g.guild_id}: ${err.message}`);
+    }
+  }
 }
 
 module.exports = { startAllJobs };

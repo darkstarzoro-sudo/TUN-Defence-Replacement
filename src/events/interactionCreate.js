@@ -53,6 +53,11 @@ async function handleWarClaim(interaction, roomId, client) {
     const room = queryOne('SELECT * FROM war_rooms WHERE id=? AND status=?', [roomId, 'active']);
     if (!room) return interaction.editReply('❌ This is not an active war room.');
 
+    const milRole = queryOne(`SELECT discord_role_id FROM guild_roles WHERE guild_id=? AND role_type='military'`, [interaction.guildId]);
+    if (milRole?.discord_role_id && !interaction.member.roles.cache.has(milRole.discord_role_id)) {
+      return interaction.editReply(`❌ Only members with the <@&${milRole.discord_role_id}> role can claim a war room.`);
+    }
+
     run('UPDATE war_rooms SET director_discord_id=? WHERE id=?', [interaction.user.id, room.id]);
 
     const updatedRoom = queryOne('SELECT * FROM war_rooms WHERE id=?', [room.id]);

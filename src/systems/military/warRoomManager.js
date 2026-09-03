@@ -6,7 +6,9 @@
 
 const { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { query, run, queryOne } = require('../../utils/database');
-const { pwQuery } = require('../../utils/pwApi');
+const { pwQuery, MEMBER_POSITIONS } = require('../../utils/pwApi');
+const { buildNationToDiscordMap } = require('../../utils/nationLink');
+const { isLegitimateCounter } = require('../../utils/counterDetector');
 const { getGif, normalizeAttackType } = require('../../utils/attackGifs');
 const logger = require('../../utils/logger');
 
@@ -386,17 +388,20 @@ function buildAttackReport(attack, ctx={}) {
   const defName      = resolveAttackName(attack.defid, ctx);
   const normType     = normalizeAttackType(attack.type);
   const isPeace      = normType === 'PEACE';
+  const isFortify    = normType === 'FORTIFY';
+  const skipOutcome  = isPeace || isFortify;
 
-  // A peace offer isn't a combat roll — "pyrrhic victory" / "immense
-  // triumph" style commentary doesn't make sense attached to it, so peace
-  // gets its own plain description with no success-tier language or color.
-  const resultText = isPeace ? null
+  // A peace offer or a fortify action isn't a combat roll — "pyrrhic
+  // victory" / "immense triumph" style commentary doesn't make sense
+  // attached to either, so both get a plain description with no
+  // success-tier language or color.
+  const resultText = skipOutcome ? null
     : successTag==='UTTER_FAILURE' ? 'an **utter failure**'
     : successTag==='PYRRHIC_VICTORY' ? 'a **pyrrhic victory** — won at great cost'
     : successTag==='MODERATE_SUCCESS' ? 'a **moderate success**'
     : 'an **immense triumph**';
 
-  const color = isPeace ? 0x95a5a6
+  const color = skipOutcome ? 0x95a5a6
     : successTag==='UTTER_FAILURE' ? 0xe74c3c
     : successTag==='PYRRHIC_VICTORY' ? 0xf39c12
     : successTag==='MODERATE_SUCCESS' ? 0x3498db
@@ -407,6 +412,8 @@ function buildAttackReport(attack, ctx={}) {
     .setTitle(`${typeInfo.emoji} ${typeInfo.label}`)
     .setDescription(
       isPeace
+        ? `**${attName}** ${typeInfo.verb} **${defName}**.`
+        : isFortify
         ? `**${attName}** ${typeInfo.verb} **${defName}**.`
         : `**[${attName}](https://politicsandwar.com/nation/id=${attack.attid})** ${typeInfo.verb} ` +
           `**[${defName}](https://politicsandwar.com/nation/id=${attack.defid})** — it was ${resultText}!`
@@ -518,7 +525,6 @@ async function sendWarAttacks(client, room, war_id, ctx, attacks) {
     newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
 
     for (const attack of newAttacks) {
-      if (['FORTIFY'].includes(attack.type)) continue;
       const embed = buildAttackReport(attack, ctx);
       try {
         await channel.send({ embeds: [embed] });
@@ -627,6 +633,166 @@ async function addMemberToWarRoom(client, guild, guildId, roomRow, ourDiscordId,
   await sendUnifiedWarCard(channel, roomRow);
 }
 
+// ── PERMISSION RECONCILIATION ──────────────────────────────────
+// Recomputes who SHOULD have access to a war room's channel (the
+// configured military/government roles + every currently-tracked
+// member's Discord account) and adjusts the actual Discord overwrites
+// to match — adding what's missing, removing what's stale. This is what
+// makes role changes (e.g. swapping who counts as "military") and
+// retroactive linking (a member who wasn't linked at attack time getting
+// linked later) actually take effect on existing rooms instead of only
+// applying to brand new ones.
+async function reconcileRoomPermissions(client, guild, guildId, room) {
+  try {
+    const channel = guild.channels.cache.get(room.channel_id);
+    if (!channel) return { changed: false, reason: 'channel missing' };
+
+    const milRole = queryOne(`SELECT discord_role_id FROM guild_roles WHERE guild_id=? AND role_type='military'`, [guildId]);
+    const govRole = queryOne(`SELECT discord_role_id FROM guild_roles WHERE guild_id=? AND role_type='government'`, [guildId]);
+    const members = query('SELECT discord_user_id FROM war_room_members WHERE war_room_id=? AND discord_user_id IS NOT NULL', [room.id]).rows;
+
+    const desiredIds = new Set();
+    if (milRole?.discord_role_id) desiredIds.add(milRole.discord_role_id);
+    if (govRole?.discord_role_id) desiredIds.add(govRole.discord_role_id);
+    for (const m of members) if (m.discord_user_id) desiredIds.add(String(m.discord_user_id));
+
+    const botId = client.user.id;
+    let added = 0, removed = 0;
+
+    // Remove overwrites nobody should have anymore (stale role, un-tracked member) —
+    // but never touch @everyone (the deny-all baseline) or the bot itself.
+    for (const [id] of channel.permissionOverwrites.cache) {
+      if (id === guild.roles.everyone.id || id === botId) continue;
+      if (!desiredIds.has(String(id))) {
+        await channel.permissionOverwrites.delete(id).catch(()=>{});
+        removed++;
+      }
+    }
+
+    // Add whatever's missing
+    for (const id of desiredIds) {
+      const existingOverwrite = channel.permissionOverwrites.cache.get(id);
+      if (!existingOverwrite || !existingOverwrite.allow.has(PermissionFlagsBits.ViewChannel)) {
+        await channel.permissionOverwrites.create(id, { ViewChannel:true, SendMessages:true }).catch(()=>{});
+        added++;
+      }
+    }
+
+    return { changed: added>0 || removed>0, added, removed };
+  } catch (err) {
+    logger.error(`reconcileRoomPermissions: ${err.message}`);
+    return { changed:false, error:err.message };
+  }
+}
+
+// ── SHARED SYNC ENGINE ──────────────────────────────────────────
+// The actual logic behind /warroom sync — factored out here so it can be
+// called both from the slash command AND from the scheduled auto-sync job
+// without duplicating it. Handles: creating rooms for new wars, adding
+// additional members to existing rooms, retroactively linking a member's
+// Discord account if they weren't linked at the time of their attack (and
+// fixing their channel access once they are), and reconciling every active
+// room's permissions against current role configuration.
+async function runWarRoomSync(client, guild, guildId, allianceId, { includeOffensive = true } = {}) {
+  const summary = { created:0, addedToExisting:0, existing:0, relinked:0, inactive:0, skipped:0, permissionsFixed:0, errors:[], defWarsCount:0, offWarsCount:0 };
+  const allianceIdStr = String(allianceId);
+
+  let allWars = [];
+  try {
+    const data = await pwQuery(`
+      query GetAllianceWars($allianceId:[Int]) {
+        wars(alliance_id:$allianceId, active:true, first:100) {
+          data {
+            id att_alliance_id def_alliance_id attid defid
+            att_resistance def_resistance turnsleft
+            attacker { id nation_name score alliance_position soldiers tanks aircraft ships missiles nukes spies last_active alliance { id name } }
+            defender { id nation_name score alliance_position soldiers tanks aircraft ships missiles nukes spies last_active alliance { id name } }
+          }
+        }
+      }
+    `, { allianceId: [parseInt(allianceId)] });
+    allWars = data?.wars?.data || [];
+  } catch (err) {
+    summary.errors.push(`Failed to fetch wars: ${err.message}`);
+    return summary;
+  }
+
+  const defWars = allWars.filter(w => String(w.def_alliance_id) === allianceIdStr);
+  const offWars = includeOffensive ? allWars.filter(w => String(w.att_alliance_id) === allianceIdStr) : [];
+  const warsToProcess = [...defWars, ...offWars];
+  summary.defWarsCount = defWars.length;
+  summary.offWarsCount = offWars.length;
+
+  const discordMap = buildNationToDiscordMap(guildId);
+
+  for (const war of warsToProcess) {
+    try {
+      const isOff       = String(war.att_alliance_id) === allianceIdStr;
+      const ourNation   = isOff ? war.attacker : war.defender;
+      const enemyNation = isOff ? war.defender : war.attacker;
+
+      if (!ourNation || !enemyNation) { summary.skipped++; continue; }
+      if (!MEMBER_POSITIONS.includes((ourNation.alliance_position || '').toUpperCase())) { summary.skipped++; continue; }
+
+      const ourDiscordId = discordMap.get(ourNation.id) || discordMap.get(String(ourNation.id)) || null;
+
+      const existingRoom = queryOne('SELECT id FROM war_rooms WHERE guild_id=? AND enemy_nation_id=? AND status=?', [guildId, enemyNation.id, 'active']);
+      const existingMemberRow = existingRoom && queryOne('SELECT * FROM war_room_members WHERE war_room_id=? AND war_id=?', [existingRoom.id, war.id]);
+
+      if (existingMemberRow) {
+        // Already tracked. If they weren't linked to Discord at the time
+        // (so had no channel access, no mention) but ARE linked now, fix
+        // that retroactively instead of leaving them stuck forever.
+        if (!existingMemberRow.discord_user_id && ourDiscordId) {
+          run('UPDATE war_room_members SET discord_user_id=?, nation_name=? WHERE id=?', [ourDiscordId, ourNation.nation_name, existingMemberRow.id]);
+          summary.relinked++;
+        } else {
+          summary.existing++;
+          continue;
+        }
+      } else {
+        if (isInactiveNation(enemyNation.last_active)) { summary.inactive++; continue; }
+
+        const counterResult = await isLegitimateCounter(guildId, allianceId, enemyNation.id, enemyNation.alliance?.id);
+        if (isOff && !counterResult.isCounter) {
+          const dnrEntry = queryOne('SELECT id FROM dnr_list WHERE guild_id=? AND alliance_id=?', [guildId, parseInt(enemyNation.alliance?.id || 0)]);
+          if (dnrEntry) { summary.skipped++; continue; }
+        }
+
+        run(`INSERT OR IGNORE INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'war_seen',?,datetime('now'))`,
+          [guildId, `war_${guildId}_${war.id}_${isOff ? 'off' : 'def'}`]);
+
+        const enrichedWar = {
+          id: war.id, isOurAttack: isOff, ourNationId: ourNation.id, turnsleft: war.turnsleft,
+          ourResistance: isOff ? war.att_resistance : war.def_resistance,
+          enemyResistance: isOff ? war.def_resistance : war.att_resistance,
+        };
+
+        const result = await getOrCreateWarRoom(client, guild, guildId, enemyNation, ourDiscordId, ourNation.nation_name, enrichedWar, counterResult.isCounter, counterResult.detail);
+        if (result && existingRoom) summary.addedToExisting++;
+        else if (result) summary.created++;
+        else summary.skipped++;
+
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    } catch (err) {
+      summary.errors.push(`War ${war.id}: ${err.message}`);
+      summary.skipped++;
+    }
+  }
+
+  // Reconcile permissions across EVERY active room in this guild — not just
+  // ones tied to a war matched this cycle — so role config changes and
+  // retroactive links propagate everywhere they should.
+  const allActiveRooms = query('SELECT * FROM war_rooms WHERE guild_id=? AND status=?', [guildId, 'active']).rows;
+  for (const room of allActiveRooms) {
+    const result = await reconcileRoomPermissions(client, guild, guildId, room);
+    if (result.changed) summary.permissionsFixed++;
+  }
+
+  return summary;
+}
+
 async function removeMemberFromWarRoom(client, guild, guildId, nationId, warId) {
   try {
     const member = queryOne(`SELECT wrm.*,wr.channel_id,wr.id as room_id FROM war_room_members wrm JOIN war_rooms wr ON wr.id=wrm.war_room_id WHERE wr.guild_id=? AND wrm.nation_id=? AND wrm.war_id=?`, [guildId,nationId,warId]);
@@ -645,4 +811,4 @@ async function removeMemberFromWarRoom(client, guild, guildId, nationId, warId) 
   } catch (err) { logger.error(`removeMemberFromWarRoom: ${err.message}`); }
 }
 
-module.exports = { getOrCreateWarRoom, removeMemberFromWarRoom, buildWarButtons, fetchWarData, fetchNationData, sendUnifiedWarCard, checkWarRoomAttacks, isInactiveNation, daysSinceActive, closeWarRoomForInactivity, INACTIVITY_DAYS };
+module.exports = { getOrCreateWarRoom, removeMemberFromWarRoom, buildWarButtons, fetchWarData, fetchNationData, sendUnifiedWarCard, checkWarRoomAttacks, isInactiveNation, daysSinceActive, closeWarRoomForInactivity, INACTIVITY_DAYS, runWarRoomSync, reconcileRoomPermissions };
