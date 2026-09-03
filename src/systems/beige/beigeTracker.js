@@ -48,7 +48,9 @@ async function getEligibleAttackers(guildId, targetScore) {
     const guildRow = queryOne('SELECT alliance_id FROM guilds WHERE guild_id = ?', [guildId]);
     if (!guildRow?.alliance_id) return [];
     const members = await getAllianceMembers(guildRow.alliance_id);
-    const min = targetScore / 1.75, max = targetScore / 0.75;
+    // War range: member.score must be within targetScore/1.5 to targetScore/0.75
+    // (target's score within 75%-150% of the member's own score, solved for member.score)
+    const min = targetScore / 1.5, max = targetScore / 0.75;
     return members.filter(m => m.score >= min && m.score <= max && !m.vacation_mode_turns && (m.offensive_wars_count || 0) < 5).map(m => ({ ...m, openSlots: 5 - (m.offensive_wars_count || 0) }));
   } catch { return []; }
 }

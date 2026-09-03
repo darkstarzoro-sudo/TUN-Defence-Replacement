@@ -153,8 +153,9 @@ async function sendDefenseAlert(channel, guildId, war, defender, attacker, defDi
     const ping       = roleRow ? `<@&${roleRow.discord_role_id}>` : '';
     const defMention = defDiscordId ? `<@${defDiscordId}>` : `**${defender.nation_name}**`;
 
-    const minScore = (attacker.score || 0) * 0.75;
-    const maxScore = (attacker.score || 0) * 1.75;
+    // War range: member.score must be within attacker.score/1.5 to attacker.score/0.75
+    const minScore = (attacker.score || 0) / 1.5;
+    const maxScore = (attacker.score || 0) / 0.75;
     const counters = ourMembers
       .filter(m => m.score >= minScore && m.score <= maxScore && (m.vacation_mode_turns||0) === 0 && (m.offensive_wars_count||0) < 5)
       .sort((a, b) => (5-(b.offensive_wars_count||0)) - (5-(a.offensive_wars_count||0)))

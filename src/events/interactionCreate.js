@@ -99,7 +99,9 @@ async function handleWarCounter(interaction, warId, client) {
     if (!enemyData) return interaction.editReply('❌ Could not fetch enemy data.');
 
     const discordMap = buildNationToDiscordMap(interaction.guildId);
-    const min = (enemyData.score||0) * 0.75, max = (enemyData.score||0) * 1.75;
+    // War range: member.score must be within enemy.score/1.5 to enemy.score/0.75
+    // (target's score within 75%-150% of the member's own score, solved for member.score)
+    const min = (enemyData.score||0) / 1.5, max = (enemyData.score||0) / 0.75;
     const eligible = ourMembers
       .filter(m => m.score >= min && m.score <= max && (m.vacation_mode_turns||0) === 0 && (m.offensive_wars_count||0) < 5)
       .sort((a, b) => (b.aircraft||0) - (a.aircraft||0));

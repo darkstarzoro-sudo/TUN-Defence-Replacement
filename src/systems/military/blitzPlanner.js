@@ -52,8 +52,9 @@ function scoreAttackerSuitability(attacker, target, weights) {
   let suitability = 0;
 
   // Check if in range (required — this is a hard filter)
-  const minScore = target.score * 0.75;
-  const maxScore = target.score * 1.75;
+  // War range: attacker.score must be within target.score/1.5 to target.score/0.75
+  const minScore = target.score / 1.5;
+  const maxScore = target.score / 0.75;
   if (attacker.score < minScore || attacker.score > maxScore) return -1;
 
   // Skip if no open offensive slots

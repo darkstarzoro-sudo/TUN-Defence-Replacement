@@ -25,7 +25,8 @@ function scoreTarget(nation, ourMembers) {
   score += Math.min(nation.num_cities * 2, 30);
 
   // How many of our members can hit them?
-  const minScore = nation.score / 1.75;
+  // War range: member.score must be within nation.score/1.5 to nation.score/0.75
+  const minScore = nation.score / 1.5;
   const maxScore = nation.score / 0.75;
   const eligible = ourMembers.filter(m =>
     m.score >= minScore && m.score <= maxScore &&

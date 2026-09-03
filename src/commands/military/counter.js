@@ -72,8 +72,13 @@ module.exports = {
       // Get our members (no applicants)
       const members = await getAllianceMembers(guildRow.alliance_id);
 
-      // War range: can counter if score is between target/1.75 and target/0.75
-      const minScore = attacker.score / 1.75;
+      // War range: a nation can declare on targets whose score is within
+      // 75%-150% of their own. Solved for "which of our members can hit
+      // this specific enemy": member.score must be between
+      // enemy.score/1.5 and enemy.score/0.75. (The previous /1.75 lower
+      // bound didn't correspond to any consistent percentage rule and let
+      // through members who were actually out of real war range.)
+      const minScore = attacker.score / 1.5;
       const maxScore = attacker.score / 0.75;
 
       const eligible = members.filter(m => {

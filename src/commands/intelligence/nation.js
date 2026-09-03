@@ -150,9 +150,15 @@ module.exports = {
     }
 
     // ── EMBED 4: WAR RANGE ───────────────────────────────────
+    // War range: a nation can declare on targets within 75%-150% of its
+    // own score. "Who can attack this nation" (score S fixed as target)
+    // needs the attacker's score A such that S is in [0.75A, 1.5A], i.e.
+    // A in [S/1.5, S/0.75] — division. "Who this nation can attack" (S is
+    // the attacker) needs targets directly in [0.75S, 1.5S] — multiplication.
+    // These were previously swapped (and both used a wrong /1.75 ratio).
     const score = nation.score || 0;
-    const minScore = Math.round(score * 0.75);
-    const maxScore = Math.round(score * 1.75);
+    const minScore = Math.round(score / 1.5);
+    const maxScore = Math.round(score / 0.75);
 
     embeds.push(
       new EmbedBuilder()
@@ -166,7 +172,7 @@ module.exports = {
           },
           {
             name: '🗡️ Who this nation can attack',
-            value: `Nations with score between **${Math.round(score / 1.75).toLocaleString()}** and **${Math.round(score / 0.75).toLocaleString()}**`,
+            value: `Nations with score between **${Math.round(score * 0.75).toLocaleString()}** and **${Math.round(score * 1.5).toLocaleString()}**`,
             inline: false,
           },
           {
