@@ -423,6 +423,27 @@ function getLootLineForAttack(attack) {
   return null;
 }
 
+// P&W logs both a peace offer AND its acceptance as separate PEACE-type
+// attacks, with attid/defid REVERSED between the two (whoever accepts
+// becomes the "attacker" on that record, targeting whoever originally
+// offered). Without tracking this, both records get described identically
+// ("X offered peace to Y") even though the second one is actually Y
+// accepting X's offer. This remembers who made the last peace move in each
+// war (reusing the existing alert_settings key-value table — no schema
+// change needed) so the second record can be correctly described as an
+// acceptance instead of a second, confusing "offer".
+function resolvePeaceAction(guildId, warId, attack) {
+  const key = String(warId);
+  const prevRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='peace_tracker' AND setting_key=?`, [guildId, key]);
+  const prevMoverId = prevRow?.setting_value;
+  const isAccept = prevMoverId && String(attack.attid) !== String(prevMoverId) && String(attack.defid) === String(prevMoverId);
+
+  run(`INSERT INTO alert_settings (guild_id,alert_type,setting_key,setting_value) VALUES(?,'peace_tracker',?,?) ON CONFLICT(guild_id,alert_type,setting_key) DO UPDATE SET setting_value=excluded.setting_value`,
+    [guildId, key, String(attack.attid)]);
+
+  return isAccept ? 'accept' : 'offer';
+}
+
 // NOTE: WarAttack does NOT expose att_nation_name/def_nation_name in the P&W API
 // (confirmed via live GraphQL validation error). Names are resolved from the
 // war room's own known nations (ctx) instead of the attack payload.
@@ -452,11 +473,15 @@ function buildAttackReport(attack, ctx={}) {
     : successTag==='MODERATE_SUCCESS' ? 0x3498db
     : 0x2ecc71;
 
+  const isPeaceAccept = isPeace && attack._peaceAction === 'accept';
+
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${typeInfo.emoji} ${typeInfo.label}`)
+    .setTitle(isPeaceAccept ? '🕊️ Peace Accepted' : `${typeInfo.emoji} ${typeInfo.label}`)
     .setDescription(
-      isPeace
+      isPeaceAccept
+        ? `**${attName}** has accepted peace from **${defName}**.`
+        : isPeace
         ? `**${attName}** ${typeInfo.verb} **${defName}**.`
         : isFortify
         ? `**${attName}** ${typeInfo.verb} **${defName}**.`
@@ -579,6 +604,9 @@ async function sendWarAttacks(client, room, war_id, ctx, attacks) {
     newAttacks.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
 
     for (const attack of newAttacks) {
+      if (normalizeAttackType(attack.type) === 'PEACE') {
+        attack._peaceAction = resolvePeaceAction(room.guild_id, war_id, attack);
+      }
       const embed = buildAttackReport(attack, ctx);
       try {
         await channel.send({ embeds: [embed] });
