@@ -261,41 +261,22 @@ async function fetchAttacksBatch(warIds) {
   const ids = [...new Set(warIds.map(id => parseInt(id)).filter(Boolean))];
   if (ids.length === 0) return [];
 
-  const baseFields = `
-    id war_id attid defid
-    type victor success
-    att_mun_used def_mun_used att_gas_used def_gas_used
-    infra_destroyed infra_destroyed_value
-    att_soldiers_lost def_soldiers_lost att_tanks_lost def_tanks_lost
-    att_aircraft_lost def_aircraft_lost att_ships_lost def_ships_lost
-    moneystolen loot_info
-    date
-  `;
-
-  // The old (deprecated) v2 War Attacks API had a `note` field that, for a
-  // war-ending attack, contained a human-readable sentence like "<NATION>
-  // won the war and looted <resources>." — matching exactly the in-game war
-  // timeline text for a VICTORY. It's not confirmed this field exists under
-  // the same name in the current v3 GraphQL schema, so this tries it first
-  // and falls back to the known-safe query (no `note`) if it doesn't exist,
-  // rather than risk breaking attack fetching entirely on a wrong guess.
+  // NOTE: previously also tried a `note` field here (the old v2 API had one
+  // carrying a human-readable victory/loot sentence). Confirmed via live
+  // API error on 2026-09-05 that `note` does NOT exist on WarAttack in v3
+  // ("Cannot query field \"note\" on type \"WarAttack\"") — removed rather
+  // than keep paying for a guaranteed-failing API call every single cycle.
   try {
     const data = await pwQuery(`
       query A($warId:[Int]){warattacks(war_id:$warId,orderBy:{column:ID,order:DESC},first:100){data{
-        ${baseFields}
-        note
-      }}}
-    `, { warId: ids });
-    const attacks = data?.warattacks?.data;
-    if (attacks) return attacks;
-  } catch (err) {
-    logger.warn(`fetchAttacksBatch: 'note' field query failed (${err.message}) — falling back without it.`);
-  }
-
-  try {
-    const data = await pwQuery(`
-      query A($warId:[Int]){warattacks(war_id:$warId,orderBy:{column:ID,order:DESC},first:100){data{
-        ${baseFields}
+        id war_id attid defid
+        type victor success
+        att_mun_used def_mun_used att_gas_used def_gas_used
+        infra_destroyed infra_destroyed_value
+        att_soldiers_lost def_soldiers_lost att_tanks_lost def_tanks_lost
+        att_aircraft_lost def_aircraft_lost att_ships_lost def_ships_lost
+        moneystolen loot_info
+        date
       }}}
     `, { warId: ids });
     return data?.warattacks?.data || [];
