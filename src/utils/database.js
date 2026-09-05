@@ -276,6 +276,7 @@ function addWarRoomTables() {
         enemy_nation_id INTEGER NOT NULL, enemy_nation_name TEXT,
         enemy_alliance_name TEXT, director_discord_id TEXT,
         card_message_id TEXT, status TEXT DEFAULT 'active',
+        room_type TEXT DEFAULT 'auto',
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(guild_id, channel_id)
       );
@@ -289,6 +290,24 @@ function addWarRoomTables() {
     `);
   } catch (err) {}
   migrateWarRoomMembersUnique();
+  migrateWarRoomsRoomType();
+}
+
+// Adds room_type to war_rooms for databases created before the manual
+// "planning" room feature (/warroom create) — 'auto' for normal
+// reactively-created rooms, 'planned' for ones set up ahead of a
+// declaration, which are exempt from inactivity auto-closing.
+function migrateWarRoomsRoomType() {
+  if (!db) return;
+  try {
+    const cols = db.exec(`PRAGMA table_info(war_rooms)`);
+    const hasColumn = cols.length > 0 && cols[0].values.some(row => row[1] === 'room_type');
+    if (hasColumn) return;
+    db.run(`ALTER TABLE war_rooms ADD COLUMN room_type TEXT DEFAULT 'auto'`);
+    saveDatabase();
+  } catch (err) {
+    logger.error(`migrateWarRoomsRoomType: ${err.message}`);
+  }
 }
 
 // One-time migration for databases created before this fix: the old

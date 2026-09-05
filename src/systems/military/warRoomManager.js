@@ -66,23 +66,30 @@ async function buildUnifiedWarCards(room) {
   const enemyData = await fetchNationData(room.enemy_nation_id);
 
   const memberResults = await Promise.all(members.map(async (m) => {
+    const isPlanned = !m.war_id;
     const [warData, ourData] = await Promise.all([
-      fetchWarData(m.war_id, m.nation_id, room.enemy_nation_id),
-      fetchNationData(m.nation_id),
+      isPlanned ? Promise.resolve(null) : fetchWarData(m.war_id, m.nation_id, room.enemy_nation_id),
+      m.nation_id ? fetchNationData(m.nation_id) : Promise.resolve(null),
     ]);
-    return { member: m, warData, ourData };
+    return { member: m, warData, ourData, isPlanned };
   }));
 
-  const memberFields = memberResults.map(({ member, warData, ourData }) => {
-    const name = `🛡️ ${member.discord_user_id ? `<@${member.discord_user_id}> — ` : ''}${ourData?.nation_name || member.nation_name || 'Unknown'}`;
-    const value = [
-      `⭐ NS: **${Math.round(ourData?.score||0).toLocaleString()}** | 🏙️ Cities: **${ourData?.num_cities??'?'}**`,
-      `👮 ${(ourData?.soldiers||0).toLocaleString()} | 🚗 ${(ourData?.tanks||0).toLocaleString()} | ✈️ ${ourData?.aircraft||0} | 🚢 ${ourData?.ships||0}`,
-      `🚀 ${ourData?.missiles||0} | ☢️ ${ourData?.nukes||0} | 🕵️ ${ourData?.spies||0}`,
-      `❤️ Resistance: **${warData?.ourResistance??'?'}/100** (enemy: **${warData?.enemyResistance??'?'}/100**) | ⏳ Turns Left: **${warData?.turnsleft??'?'}**`,
-      `🎯 MAP: **${warData?.ourMAP??'?'}/12** (enemy: **${warData?.enemyMAP??'?'}/12**)`,
-      `[View This War](https://politicsandwar.com/nation/war/timeline/war=${member.war_id})`,
-    ].join('\n');
+  const memberFields = memberResults.map(({ member, warData, ourData, isPlanned }) => {
+    const name = `${isPlanned ? '⏳' : '🛡️'} ${member.discord_user_id ? `<@${member.discord_user_id}> — ` : ''}${ourData?.nation_name || member.nation_name || 'Unknown'}`;
+    const value = isPlanned
+      ? [
+          `⭐ NS: **${Math.round(ourData?.score||0).toLocaleString()}** | 🏙️ Cities: **${ourData?.num_cities??'?'}**`,
+          `👮 ${(ourData?.soldiers||0).toLocaleString()} | 🚗 ${(ourData?.tanks||0).toLocaleString()} | ✈️ ${ourData?.aircraft||0} | 🚢 ${ourData?.ships||0}`,
+          `_Planned attacker — hasn't declared yet. Card will activate automatically once they do._`,
+        ].join('\n')
+      : [
+          `⭐ NS: **${Math.round(ourData?.score||0).toLocaleString()}** | 🏙️ Cities: **${ourData?.num_cities??'?'}**`,
+          `👮 ${(ourData?.soldiers||0).toLocaleString()} | 🚗 ${(ourData?.tanks||0).toLocaleString()} | ✈️ ${ourData?.aircraft||0} | 🚢 ${ourData?.ships||0}`,
+          `🚀 ${ourData?.missiles||0} | ☢️ ${ourData?.nukes||0} | 🕵️ ${ourData?.spies||0}`,
+          `❤️ Resistance: **${warData?.ourResistance??'?'}/100** (enemy: **${warData?.enemyResistance??'?'}/100**) | ⏳ Turns Left: **${warData?.turnsleft??'?'}**`,
+          `🎯 MAP: **${warData?.ourMAP??'?'}/12** (enemy: **${warData?.enemyMAP??'?'}/12**)`,
+          `[View This War](https://politicsandwar.com/nation/war/timeline/war=${member.war_id})`,
+        ].join('\n');
     return { name: name.slice(0,256), value: value.slice(0,1024), inline: false };
   });
 
@@ -695,6 +702,72 @@ async function createWarRoom(client, guild, guildId, enemyNation, ourDiscordId, 
   return { id:roomId, channel_id:channel.id };
 }
 
+// Creates a war room AHEAD of any actual declaration, for a target the
+// alliance is planning to jump — via /warroom create. Attackers are added
+// as "planned" members (war_id left NULL) with full channel access; when
+// any of them actually declares, addMemberToWarRoom recognizes their
+// nation_id already has a planned row here and activates it in place
+// rather than creating a duplicate. Planned rooms are marked room_type
+// 'planned' so the inactivity auto-closer leaves them alone while waiting.
+async function createPlannedWarRoom(client, guild, guildId, targetNation, plannedAttackers) {
+  const catRow = queryOne(`SELECT setting_value FROM alert_settings WHERE guild_id=? AND alert_type='warroom' AND setting_key='category_id'`, [guildId]);
+  if (!catRow) return { error: 'No war room category configured. Run `/warroom setup` first.' };
+  const category = guild.channels.cache.get(catRow.setting_value);
+  if (!category) return { error: 'Configured war room category no longer exists.' };
+
+  const childCount = guild.channels.cache.filter(c => c.parentId === category.id).size;
+  if (childCount >= 50) return { error: `War room category "${category.name}" is full (50 channels).` };
+
+  // If a room already exists for this enemy (auto-created or previously
+  // planned), add the new planned attackers into it instead of making a
+  // duplicate channel.
+  const existingRoom = queryOne('SELECT * FROM war_rooms WHERE guild_id=? AND enemy_nation_id=? AND status=?', [guildId, targetNation.id, 'active']);
+
+  const milRole = queryOne(`SELECT discord_role_id FROM guild_roles WHERE guild_id=? AND role_type='military'`, [guildId]);
+  const govRole = queryOne(`SELECT discord_role_id FROM guild_roles WHERE guild_id=? AND role_type='government'`, [guildId]);
+
+  let channel, roomId, roomRow;
+  if (existingRoom) {
+    channel = guild.channels.cache.get(existingRoom.channel_id);
+    if (!channel) return { error: 'A room is tracked for this enemy but its channel no longer exists — run `/warroom sync` first to clean that up, then try again.' };
+    roomId = existingRoom.id;
+    roomRow = existingRoom;
+  } else {
+    const overwrites = [{ id:guild.roles.everyone.id, deny:[PermissionFlagsBits.ViewChannel] }];
+    if (milRole) overwrites.push({ id:milRole.discord_role_id, allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages] });
+    if (govRole) overwrites.push({ id:govRole.discord_role_id, allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages] });
+
+    const safeName = (targetNation.nation_name||'unknown').toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').slice(0,80);
+    channel = await guild.channels.create({ name:`⚔️-${safeName}`, type:ChannelType.GuildText, parent:category.id, topic:`Planned war vs ${targetNation.nation_name} | ${targetNation.alliance?.name||'None'}`, permissionOverwrites:overwrites });
+
+    run(`INSERT INTO war_rooms (guild_id,channel_id,enemy_nation_id,enemy_nation_name,enemy_alliance_name,status,room_type) VALUES(?,?,?,?,?,'active','planned')`,
+      [guildId, channel.id, targetNation.id, targetNation.nation_name, targetNation.alliance?.name||'None']);
+    roomRow = queryOne('SELECT * FROM war_rooms WHERE guild_id=? AND channel_id=?', [guildId, channel.id]);
+    roomId = roomRow.id;
+  }
+
+  const added = [], skipped = [];
+  for (const attacker of plannedAttackers) {
+    const already = queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND nation_id=? AND war_id IS NULL', [roomId, attacker.nationId]);
+    if (already) { skipped.push(`${attacker.nationName} (already planned)`); continue; }
+    const alreadyAtWar = queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND nation_id=? AND war_id IS NOT NULL', [roomId, attacker.nationId]);
+    if (alreadyAtWar) { skipped.push(`${attacker.nationName} (already at war here)`); continue; }
+
+    run(`INSERT OR IGNORE INTO war_room_members (war_room_id,discord_user_id,nation_id,nation_name,war_id) VALUES(?,?,?,?,NULL)`,
+      [roomId, attacker.discordUserId, attacker.nationId, attacker.nationName]);
+    if (attacker.discordUserId) await channel.permissionOverwrites.create(attacker.discordUserId, {ViewChannel:true,SendMessages:true}).catch(()=>{});
+    added.push(attacker.nationName);
+  }
+
+  const mentionList = plannedAttackers.filter(a=>added.includes(a.nationName) && a.discordUserId).map(a=>`<@${a.discordUserId}>`).join(' ');
+  await channel.send({ content: `📋 **War Room Planned** — Target: **${targetNation.nation_name}**\n${mentionList ? mentionList + '\n' : ''}Cards will activate automatically as each attacker declares. This room won't be auto-closed for inactivity — delete it manually when you're done.` });
+
+  await sendUnifiedWarCard(channel, queryOne('SELECT * FROM war_rooms WHERE id=?', [roomId]));
+
+  logger.info(`Planned war room ${existingRoom ? 'updated' : 'created'}: ${channel.name} (+${added.length} planned attackers)`);
+  return { id: roomId, channel_id: channel.id, added, skipped, merged: !!existingRoom };
+}
+
 // Adds ANOTHER of our members to an already-existing war room against this
 // same enemy. Previously this only sent a plain-text line and never gave
 // the new member their own war card — the unified card fixes that by
@@ -709,9 +782,21 @@ async function addMemberToWarRoom(client, guild, guildId, roomRow, ourDiscordId,
   if (!channel) return;
   const already = queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND war_id=?', [roomRow.id, war.id]);
   if (already) return;
-  run(`INSERT OR IGNORE INTO war_room_members (war_room_id,discord_user_id,nation_id,nation_name,war_id) VALUES(?,?,?,?,?)`, [roomRow.id,ourDiscordId,war.ourNationId,ourMemberName,war.id]);
+
+  // Was this nation already sitting in the room as a PLANNED attacker
+  // (added via /warroom create, war_id still NULL) waiting for exactly
+  // this declaration? If so, activate that row in place instead of
+  // inserting a duplicate — this is what makes "@member joined the fray"
+  // + the war card show up correctly for a pre-planned attacker.
+  const plannedRow = queryOne('SELECT id FROM war_room_members WHERE war_room_id=? AND war_id IS NULL AND nation_id=?', [roomRow.id, war.ourNationId]);
+  if (plannedRow) {
+    run('UPDATE war_room_members SET war_id=?, discord_user_id=COALESCE(discord_user_id,?), nation_name=? WHERE id=?', [war.id, ourDiscordId, ourMemberName, plannedRow.id]);
+  } else {
+    run(`INSERT OR IGNORE INTO war_room_members (war_room_id,discord_user_id,nation_id,nation_name,war_id) VALUES(?,?,?,?,?)`, [roomRow.id,ourDiscordId,war.ourNationId,ourMemberName,war.id]);
+  }
+
   if (ourDiscordId) await channel.permissionOverwrites.create(ourDiscordId, {ViewChannel:true,SendMessages:true}).catch(()=>{});
-  await channel.send({ content:`${ourDiscordId?`<@${ourDiscordId}>`:`**${ourMemberName}**`} also joined the fray! ⚔️`+(isCounter?`\n🔄 **COUNTER WAR** — _${counterDetail}_`:'') });
+  await channel.send({ content:`${ourDiscordId?`<@${ourDiscordId}>`:`**${ourMemberName}**`} joined the fray! ⚔️`+(isCounter?`\n🔄 **COUNTER WAR** — _${counterDetail}_`:'') });
   await sendUnifiedWarCard(channel, roomRow);
 }
 
@@ -893,4 +978,4 @@ async function removeMemberFromWarRoom(client, guild, guildId, nationId, warId) 
   } catch (err) { logger.error(`removeMemberFromWarRoom: ${err.message}`); }
 }
 
-module.exports = { getOrCreateWarRoom, removeMemberFromWarRoom, buildWarButtons, fetchWarData, fetchNationData, sendUnifiedWarCard, checkWarRoomAttacks, isInactiveNation, daysSinceActive, closeWarRoomForInactivity, INACTIVITY_DAYS, runWarRoomSync, reconcileRoomPermissions };
+module.exports = { getOrCreateWarRoom, removeMemberFromWarRoom, buildWarButtons, fetchWarData, fetchNationData, sendUnifiedWarCard, checkWarRoomAttacks, isInactiveNation, daysSinceActive, closeWarRoomForInactivity, INACTIVITY_DAYS, runWarRoomSync, reconcileRoomPermissions, createPlannedWarRoom };

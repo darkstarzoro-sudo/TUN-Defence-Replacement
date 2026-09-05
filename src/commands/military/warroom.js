@@ -4,7 +4,9 @@
 
 const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 const { run, queryOne, query } = require('../../utils/database');
-const { isInactiveNation, sendUnifiedWarCard, runWarRoomSync } = require('../../systems/military/warRoomManager');
+const { isInactiveNation, sendUnifiedWarCard, runWarRoomSync, createPlannedWarRoom } = require('../../systems/military/warRoomManager');
+const { resolveNation, getAllianceMembers } = require('../../utils/pwApi');
+const { getLinkedNation, buildNationToDiscordMap } = require('../../utils/nationLink');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,6 +31,12 @@ module.exports = {
       sub.setName('autosync')
         .setDescription('Turn the automatic background sync on or off')
         .addBooleanOption(opt => opt.setName('enabled').setDescription('On or off').setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName('create')
+        .setDescription('Set up a war room ahead of time for a planned target, before anyone declares')
+        .addStringOption(opt => opt.setName('target').setDescription('Enemy nation name, profile link, or ID').setRequired(true))
+        .addStringOption(opt => opt.setName('attackers').setDescription('Comma-separated: @mentions, Discord names, or nation names').setRequired(true))
     ),
 
   requiredRole: 'military',
@@ -143,5 +151,87 @@ module.exports = {
         flags: 64,
       });
     }
+
+    // ── CREATE — set up a room ahead of time for a planned target ─
+    if (sub === 'create') {
+      await interaction.deferReply({ flags: 64 });
+
+      const targetInput = interaction.options.getString('target');
+      const attackersInput = interaction.options.getString('attackers');
+
+      const targetNation = await resolveNation(targetInput);
+      if (!targetNation) return interaction.editReply(`❌ Could not find a nation matching "${targetInput}".`);
+
+      const guildRow = queryOne('SELECT alliance_id FROM guilds WHERE guild_id=?', [interaction.guildId]);
+      const allianceMembers = guildRow?.alliance_id ? await getAllianceMembers(guildRow.alliance_id) : [];
+
+      const tokens = attackersInput.split(',').map(t => t.trim()).filter(Boolean);
+      if (tokens.length === 0) return interaction.editReply('❌ No attackers provided.');
+
+      const resolved = [], unresolved = [];
+      for (const token of tokens) {
+        const result = resolveAttackerToken(token, interaction.guild, interaction.guildId, allianceMembers);
+        if (result.error) unresolved.push(`**${token}**: ${result.error}`);
+        else resolved.push(result);
+      }
+
+      if (resolved.length === 0) {
+        return interaction.editReply(`❌ Could not resolve any attackers.\n${unresolved.join('\n')}`);
+      }
+
+      const result = await createPlannedWarRoom(interaction.client, interaction.guild, interaction.guildId, targetNation, resolved);
+      if (result.error) return interaction.editReply(`❌ ${result.error}`);
+
+      const embed = new EmbedBuilder()
+        .setTitle(result.merged ? '📋 Added to Existing War Room' : '📋 War Room Planned')
+        .setColor(0x3498db)
+        .setDescription(`Target: **${targetNation.nation_name}**\nRoom: <#${result.channel_id}>`)
+        .addFields({ name: '✅ Added', value: result.added.length ? result.added.join('\n') : 'None', inline: true });
+      if (result.skipped.length > 0) embed.addFields({ name: '⏭️ Skipped', value: result.skipped.join('\n'), inline: true });
+      if (unresolved.length > 0) embed.addFields({ name: '⚠️ Unresolved', value: unresolved.join('\n').slice(0, 1020), inline: false });
+
+      return interaction.editReply({ embeds: [embed] });
+    }
   },
 };
+
+// Resolves one comma-separated "attackers" token to a Discord user + P&W
+// nation. Accepts a @mention, a plain Discord username/display name, or a
+// P&W nation name (matched against the alliance's own roster). A nation_id
+// is required to track the planned attacker (it's what later links their
+// real declaration back to this row), so an unlinked Discord mention with
+// no nation is reported as an error rather than silently added broken.
+function resolveAttackerToken(token, guild, guildId, allianceMembers) {
+  token = token.trim();
+  if (!token) return { error: 'empty' };
+
+  const mentionMatch = token.match(/^<@!?(\d+)>$/);
+  let discordUserId = mentionMatch ? mentionMatch[1] : null;
+
+  if (!discordUserId) {
+    const lower = token.toLowerCase();
+    const member = guild.members.cache.find(m =>
+      m.user.username.toLowerCase() === lower || (m.nickname && m.nickname.toLowerCase() === lower) || m.displayName.toLowerCase() === lower
+    );
+    if (member) discordUserId = member.id;
+  }
+
+  if (discordUserId) {
+    const link = getLinkedNation(guildId, discordUserId);
+    if (link) {
+      return { discordUserId, nationId: link.nation_id, nationName: link.nation_name || `Nation #${link.nation_id}` };
+    }
+    return { error: `<@${discordUserId}> is not linked to a nation — use \`/link\` first` };
+  }
+
+  const lowerToken = token.toLowerCase();
+  let match = allianceMembers.find(m => m.nation_name.toLowerCase() === lowerToken);
+  if (!match) match = allianceMembers.find(m => m.nation_name.toLowerCase().includes(lowerToken));
+  if (match) {
+    const map = buildNationToDiscordMap(guildId);
+    const dId = map.get(match.id) || map.get(String(match.id)) || null;
+    return { discordUserId: dId, nationId: match.id, nationName: match.nation_name };
+  }
+
+  return { error: 'could not match to a Discord member or alliance nation' };
+}
