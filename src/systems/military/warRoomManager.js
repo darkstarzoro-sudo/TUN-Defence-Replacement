@@ -510,6 +510,15 @@ function buildAttackReport(attack, ctx={}) {
   // resistance is finished off. ALLIANCELOOT = resources looted from that
   // nation's ALLIANCE. Both show a full resource breakdown when available,
   // and explicitly say so when nothing was looted rather than omitting it.
+  if (normType === 'VICTORY' || normType === 'ALLIANCELOOT') {
+    // TEMP DIAGNOSTIC: loot reporting has been wrong twice now despite two
+    // different parsing strategies (loot_info as JSON/map-string, then a
+    // 'note' sentence field) — logging the actual raw values here so the
+    // real cause is visible on the next VICTORY/ALLIANCELOOT attack instead
+    // of guessing a third time. Uses logger.info so it isn't filtered out
+    // on Railway's production log level. Remove once confirmed/fixed.
+    logger.info(`LOOT DEBUG: type=${attack.type} id=${attack.id} moneystolen=${JSON.stringify(attack.moneystolen)} loot_info=${JSON.stringify(attack.loot_info)} note=${JSON.stringify(attack.note)}`);
+  }
   if (normType === 'VICTORY') {
     const lootLine = getLootLineForAttack(attack);
     embed.addFields({ name:'🏆 Looted from Nation', value: lootLine || 'Nothing was looted.', inline:false });
